@@ -1,13 +1,11 @@
 # Execution Protocol — how the coding agent works a plan
 
-`Version: 1.1 (2026-08-12)` · `Audience: the executing AI coding agent`
+`Version: 1.2 (2026-09-17)` · `Audience: the executing AI coding agent`
 
-> **§2 is this project's own; everything else is portable.** The `Paths` block was filled in when
-> the project was scaffolded. The other three blocks are still `⟦FILL IN⟧` — a project with no code
-> yet cannot answer them honestly. See the ticket `Chore-Complete-Execution-Protocol`.
->
-> Keep the §2 blocks visibly marked as project declarations even after filling them, so the next
-> person editing this file knows which parts are local and which are the portable body.
+> **§2 is this project's own; everything else is portable.** Its declarations were filled after the
+> Xcode project existed and its build commands could be verified. Keep the §2 blocks visibly marked
+> as project declarations when they change, so the next person editing this file knows which parts
+> are local and which are portable.
 
 ---
 
@@ -21,7 +19,7 @@ deciding something yourself.
 
 **You read exactly two documents:** the active plan, and this file. The plan is written to be
 self-contained; if it points you at a third document for something you need to execute a task, treat
-that as a defect and report it (§8). (`CLAUDE.md` is loaded for you automatically and doesn't count
+that as a defect and report it (§8). (`AGENTS.md` is loaded for you automatically and doesn't count
 — it carries the project's document map and naming conventions, not execution rules.)
 
 **Read the entire plan before starting.** Not just the next task — the whole thing, including its
@@ -39,9 +37,9 @@ to surface, not a gap to fill.
 
 ## 2. Project declarations
 
-### Paths
+### Project paths
 
-Filled at scaffold time — these are the folders the project was created with.
+These are the project folders and source locations.
 
 | | |
 |---|---|
@@ -53,65 +51,54 @@ Filled at scaffold time — these are the folders the project was created with.
 | Archive catalog | `Design/Archived/ArchivedCatalog.md` — created on the first archive |
 | Architectural decisions (ADRs) | `Design/Decisions/` — created on the first ADR |
 | Canonical vocabulary | `Design/Glossary.md` — created on the first resolved term |
-| Project context & conventions | `CLAUDE.md` |
-| Deliverable / source tree | **⟦FILL IN⟧** — did not exist at scaffold time |
+| Project context & conventions | `AGENTS.md` |
+| Deliverable / source tree | `Xcode Proj/VOR Vocational.xcodeproj`, with app source and bundled content in `Xcode Proj/VOR Vocational/` |
 
 Nothing in the `Design/` root is ever archived. Everything in `Explorations/`, `Plans/` and
 `Tickets/` is. See §11.
 
-### ⟦FILL IN⟧ Gates
+### Project gates
 
 The checks that run before any task is marked done, **in this order**. The task may add more; it may
 never remove one. A gate that doesn't apply to a task simply doesn't run — you do not record that
 anywhere (§5).
 
-> *Replace with the project's real commands. Web example:*
->
-> 1. Unit tests: `npx vitest run` — green.
-> 2. Types: `npx tsc --noEmit` — clean.
-> 3. Build: `npm run build` — succeeds.
-> 4. The task's own *Done when* items, verbatim.
->
-> *Xcode example:*
->
-> 1. `xcodebuild -scheme <Scheme> test` — green.
-> 2. `swift format --lint` (or SwiftLint) — clean.
-> 3. A release-configuration build — succeeds.
-> 4. The task's own *Done when* items, verbatim.
+Run these commands from the project root. They use a temporary DerivedData directory and disable
+signing because they validate compilation, not distribution signing.
 
-State which gates are **conditional** and on what — e.g. a native-test gate that runs only when
-engine source was touched.
+1. Unit tests, once the shared scheme includes an XCTest target: `xcodebuild -project 'Xcode Proj/VOR Vocational.xcodeproj' -scheme 'VOR Vocational' -destination 'platform=macOS,arch=arm64' -derivedDataPath /private/tmp/vor-xcodebuild test CODE_SIGNING_ALLOWED=NO` — green. This gate is conditional until V0.1 adds the test target.
+2. Debug build: `xcodebuild -project 'Xcode Proj/VOR Vocational.xcodeproj' -scheme 'VOR Vocational' -configuration Debug -derivedDataPath /private/tmp/vor-xcodebuild build CODE_SIGNING_ALLOWED=NO` — succeeds.
+3. Release build: `xcodebuild -project 'Xcode Proj/VOR Vocational.xcodeproj' -scheme 'VOR Vocational' -configuration Release -derivedDataPath /private/tmp/vor-xcodebuild build CODE_SIGNING_ALLOWED=NO` — succeeds.
+4. The task's own *Done when* items, verbatim.
 
-### ⟦FILL IN⟧ Guardrails
+The test gate applies to every task after V0.1 that changes app code or tests. It does not apply to
+document-only work, or before the test target exists.
+
+### Project guardrails
 
 Hard constraints. Never violate one to make progress; needing to is a stop rule (§8).
 
-> *Replace with the project's own. Common shapes:*
->
-> - A reference implementation that is **immutable** — you work in a copy, and the two must agree.
-> - Golden vectors / fixtures that may **never** be edited or have their tolerances loosened to make
->   a failing check pass.
-> - **No new dependencies** beyond those the project already names, without owner approval. Never
->   load anything from a CDN at runtime.
-> - **No dependency upgrades** unless a task explicitly says so. Pins are pins.
-> - Schema changes bump a version and ship a migration plus a fixture.
-> - *Xcode:* never touch **signing, capabilities, entitlements, or the bundle identifier**. Treat
->   `project.pbxproj` as owner-run the way git is — hand-editing it is a corruption risk and produces
->   unreviewable diffs.
+- Do not add or upgrade dependencies without owner approval. The current project has no package dependencies.
+- Do not edit signing, capabilities, entitlements, or the bundle identifier. Do not hand-edit `project.pbxproj`; make project-target changes through Xcode.
+- Keep VOR-navigation vectors, map coordinates, and bundled JSON data honest. Do not change source data, fixtures, or test tolerances merely to make a test pass.
+- Keep the app as one macOS target through V0.5. Do not create a Swift package, an iPad target, or another platform target unless an owner-approved plan says to do so.
+- Do not make tracked source, tests, plans, or fixtures depend on `LocalOnly/`.
 
-### ⟦FILL IN⟧ Environment & toolchain
+### Environment and toolchain
 
 Anything about this machine or toolchain that changes how you work.
 
-> *Replace or delete. Example — a sandboxed machine with no network:*
->
-> Assume **no internet access**. Before any step that needs the network (package install, SDK
-> download, `git clone`, `git push`, fetching a URL), test cheaply first — attempt the smallest fetch.
-> **If it fails, do not retry workarounds:** no mirrors, no curl tricks, and never hand-write a
-> dependency in place of installing it. Mark the task `blocked`, and give the owner an exact,
-> copy-pasteable install request: what to install, the command, the expected resulting path/version,
-> and which task is waiting. Batch requests where predictable. After the owner reports done, verify
-> with a version check or one-line smoke command before resuming.
+The project runs on macOS with Xcode 27.0, build 27A266a, and Apple Swift 6.4. The shared scheme is
+`VOR Vocational`; its current deployment target is macOS 26.5 on Apple silicon.
+
+In the Codex execution environment, SwiftUI macro compilation cannot run inside the command sandbox.
+Run the `xcodebuild` gates with the required outside-sandbox approval and use the temporary
+DerivedData path shown above. A macro-helper sandbox error in a sandboxed build is an environment
+failure, not evidence of a source failure.
+
+The project does not yet have an XCTest target. V0.1 adds it. Do not install a tool or dependency
+that needs network access without owner approval. If a required tool is missing, report the command,
+expected version, and blocked task to the owner.
 
 ---
 
@@ -144,7 +131,7 @@ If the session must end mid-task, set the task `in progress` and write the *stop
 - **Adjacent problems get recorded, not fixed.** When you notice a real defect the task doesn't
   cover: append it to the plan's **Deferred** section, **and file it as a ticket in
   `Design/Tickets/`** with `Status: untriaged`, using the naming convention and ticket shape in
-  `CLAUDE.md`. Then carry on with the task. Helpfully fixing something nearby is the most common way
+  `AGENTS.md`. Then carry on with the task. Helpfully fixing something nearby is the most common way
   an executed plan goes wrong.
 
   You are the only filer that writes `untriaged` — it means *no human has assessed this yet*. Do not
@@ -322,6 +309,7 @@ Rule history. The body above is always current; this section exists so a plan wr
 rule can be understood rather than trusted. Add an entry every time a rule changes, with the date and
 what it replaced.
 
+- **1.2 (2026-09-17)** — filled the project declarations for the VOR Xcode target, validation gates, guardrails, and toolchain, replacing the scaffold placeholders.
 - **1.1 (2026-08-12)** — added §11, the single archive routine (move under the same name, one catalog
   line, one banner judgment), replacing per-skill archive steps and the date-prefixed archive
   filenames. `Paths` is now filled at scaffold time and names `Design/Tickets/` as the backlog,

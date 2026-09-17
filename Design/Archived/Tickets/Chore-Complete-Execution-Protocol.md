@@ -3,7 +3,7 @@
 Status: open
 Filed: 2026-09-17
 
-`Design/Execution-Protocol.md` was installed with three of its four declaration blocks left as
+`Execution-Protocol.md` was installed with three of its four declaration blocks left as
 `⟦FILL IN⟧`, because a project scaffolded before its first line of code cannot answer them honestly.
 They share one trigger: the moment the project exists and has a stack, all of these become answerable
 in a single sitting.

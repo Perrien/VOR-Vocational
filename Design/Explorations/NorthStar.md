@@ -2,7 +2,7 @@
 
 ## The product in one sentence
 
-VOR Navigator is a Mac and iPad teaching game where players learn real VOR navigation by planning and flying routes through a believable fictional region, using the same limited instrument information a pilot would have.
+VOR Navigator is a Mac-first teaching game where players learn real VOR navigation by planning and flying routes through a believable fictional region, using the same limited instrument information a pilot would have. iPad support is a future direction, not a current target.
 
 It should feel like a compact navigation sandbox, not a flight simulator and not a map quiz. The point is to build the player's mental picture of where they are, where they are going, and what the instruments are telling them.
 
@@ -18,24 +18,85 @@ It should feel like a compact navigation sandbox, not a flight simulator and not
 
 > Tune -> interpret -> decide -> turn -> intercept -> track -> prepare the next station -> switch -> repeat.
 
-The simulator owns the true aircraft state. Each receiver derives only the indication that its tuned, in-range station would show. The UI renders those indications. Challenge rules decide what chart information and help the player sees.
+The simulator owns the true aircraft state. Each receiver derives only the indication that its selected, in-range station would show. The UI renders those indications. Mode rules decide what chart information and help the player sees.
 
-The initial flight model can stay simple: chosen heading, constant airspeed, continuous movement, and enough altitude/performance data to support the mission. It does not need aerodynamic simulation to teach VOR navigation well.
+The current flight model is deliberately simple: a selected heading, user-set constant airspeed, continuous movement, and a manual playback multiplier. It has no altitude, aircraft-performance, terrain, or weather model.
 
 ## Learning and game modes
 
-The modes share one navigation engine. They differ in what the player is asked to do and how much help the chart gives them.
+A Skill Exercise defines one navigation problem. A Mode defines the rules around it. Learn and Practice use the same Skill Exercises at different levels of guidance. Missions combine several Skill Exercises around a concrete flight objective and always produce a score.
 
-| Mode | Player task | Why it matters |
-|---|---|---|
-| Learn / Explain | Work through a small concept, with an explanation and optional animation after an answer | Ground-school style teaching of the instrument logic |
-| Position Fix | Tune two stations, set OBS courses, read the indications, and place the hidden aircraft on the chart | Makes radial intersections concrete |
-| Radial Intercept | Establish and hold a specified radial from one station | Teaches CDI interpretation, TO/FROM, turns, and tracking |
-| Route Builder | Plan a VOR route between two airports within stated limits | Turns isolated skills into route reasoning |
-| Flight Plan | Fly a supplied multi-leg route, including tuning, intercepts, tracking, and station changes | The main live-navigation experience |
-| Navigation Challenge | Fly with fewer hints, controlled time compression, accuracy goals, and a score | Gives practiced players replayable pressure |
-| Free Navigation, later | Choose an origin and destination and fly a self-planned route | An open practice space once the core is strong |
-| Real World, later | Use maintained real-world NAVAID and geographic data | Transfer practice to actual places without making data maintenance the foundation of the app |
+### 1. Learn
+
+Learn introduces one concept or exercise at a time. It is a guided, pausable lesson that tells the player what to observe or do next, then explains why the instrument indication changes. The chart may show the aircraft, selected radials, and other geometry that makes the idea visible.
+
+The player finishes a lesson by completing its required actions, such as centering a CDI or placing a position fix. Learn records completion, not a competitive score. It may show an explanation after a wrong attempt, then let the player retry without penalty.
+
+### 2. Practice
+
+Practice lets the player repeat a named exercise or supplied route with controls for the aids that exercise permits. A Position Fix practice run, for example, can reveal the aircraft, radials, or range rings while the player learns to make a fix. A radial-intercept practice run can show the target course and give feedback after each turn.
+
+The player chooses when to begin another run and may change the available aids between runs. Practice reports the result, such as position error or tracking accuracy, but does not rank the player or impose a time limit unless that limit is part of the exercise itself.
+
+### 3. Missions
+
+Missions put several skills into one scored flight with a concrete objective, such as reaching another airport, visiting named landmarks, or recovering after an equipment failure. Before departure, the app states the objective, available instruments and chart aids, and scoring rules. Once the flight starts, it gives no step-by-step teaching prompt or answer-revealing hint.
+
+Every Mission has a score. Depending on its objective, that score can include position error, tracking accuracy, time, correct station selection, transition timing, checkpoint passage, route efficiency, and successful arrival. The debrief appears only after the run, when it can reveal the true track, the correct solution, and the instrument events that mattered.
+
+Position Fix and Radial Intercept and Track are Skill Exercises. Transport, Sightseeing, and Nav Failure are Missions. Real-world data is a future world-data source that can support any Mode once the app can maintain it.
+
+### Skill Exercises captured so far
+
+This is an unordered list of exercise ideas, not a curriculum or release order.
+
+#### Position Fix
+
+Position Fix asks the player to locate an unseen aircraft on the chart from VOR indications, then click the location they have inferred. After the player checks the answer, the app reveals the true location and reports the position error in NM.
+
+1. **Independent Position Fix.** The player gets the chart and the task to find the aircraft. They must work out which VORs may be in range, select stations to try, use the working receivers to find radial intersections, and click the resulting position. A receiver gives no usable indication for an out-of-range station, so choosing stations is part of the exercise.
+2. **Assisted Position Fix.** The app has already selected and tuned working VORs for the hidden location. The player reads the supplied receiver indications, finds their radial intersection, and clicks the chart. This removes station selection and tuning so the player can focus on turning VOR indications into a plotted position.
+3. **Tracked Position Fix.** The aircraft moves continuously while the player works. The player first finds two in-range VORs, takes and marks a position fix, then waits for the aircraft to move and takes a second fix. The bearing from the first marked fix to the second is the aircraft's track. The player uses that bearing to set the heading dial. With no wind model, the required heading matches the derived track.
+
+#### Radial Intercept and Track
+
+The app places the aircraft at a random point inside a named VOR's service volume and gives the player an outbound radial to fly, such as the 135 radial FROM the station. The player selects the station, sets the OBS to the assigned radial, interprets the CDI and TO/FROM indication, chooses an intercept heading, then turns onto and tracks the radial.
+
+The exercise ends after the player establishes and holds the assigned radial for its required distance or time. Learn can reveal the aircraft and course geometry. Practice can report intercept and tracking results. Missions can use the skill as one scored part of a larger flight.
+
+### Mission types captured so far
+
+This is an unordered list of Mission ideas, not a curriculum or release order.
+
+#### Transport
+
+Transport starts at one airport and asks the player to navigate to another. It turns individual VOR skills into a complete trip with an origin, destination, route, and arrival goal.
+
+1. **Planned Transport.** The app provides the route to fly, including its VOR legs and intended courses. The player flies that plan by selecting stations, setting the OBS, intercepting and tracking each leg, and changing to the next station at the appropriate time.
+2. **Self-Planned Transport.** The app provides an origin and destination but no route. Before departure, the player chooses the VOR legs and courses that will take them there, then flies the plan they made. This version tests both route planning and in-flight execution.
+
+#### Sightseeing
+
+Sightseeing starts at a named airport, sends the player through a set of named waypoints, and ends with a return to the departure airport. The player must fly within each waypoint's stated distance while using the chart and NAV instruments to stay oriented.
+
+`SightseeingRegions.json` already defines 11 named Myosia regions with 16 checkpoints. Each checkpoint has a tolerance from 2 to 10 NM. The current app can display those checkpoint areas on the map, but it does not yet run a mission, detect checkpoint passage, or require the return flight.
+
+#### Nav Failure
+
+Nav Failure begins during a flight to a named destination airport when the aircraft's GPS fails. The player must use VOR position-fix skills to determine their current location and track, then choose how to recover.
+
+1. **Emergency diversion.** The player declares an emergency and navigates to the nearest airport.
+2. **Continue to destination.** The player charts a new VOR route from the determined position to the original destination airport, then flies it.
+
+The current app has no GPS display, failure state, emergency-declaration flow, or route-mission system. Nav Failure is therefore a future Mission built on Position Fix and Transport.
+
+#### Off-course Recovery
+
+Off-course Recovery begins during a planned flight after the aircraft has drifted away from its active leg. The player determines their present position, chooses a radial and intercept that will rejoin the route, then establishes the aircraft on that route again. The Mission scores the recovery rather than treating the initial error as an automatic failure.
+
+#### One NAV Down
+
+One NAV Down gives the player a flight objective with only one working NAV receiver. The player must fly the route without the usual second receiver for preparing the next station or checking progress. The Mission scores completion of the objective and how well the player manages the single receiver through each station change.
 
 ### Lesson and progression path
 
@@ -75,8 +136,8 @@ The player should decide when an observation is useful. A score may reward good 
 Real geographic scale is important, but idle minutes are not the lesson. Preserve the rhythm of navigation while compressing quiet periods.
 
 - Use shorter, deliberately designed legs in early training. A roughly 12 NM leg at 120 knots is about six minutes and can still contain an intercept, tracking, preparation, and transition.
-- Provide manual simulation speeds such as 1x, 2x, 5x, 10x, and 25x where appropriate.
-- In challenge play, automatically accelerate only after the player is established on course and no decision is near. Slow back to real time before a transition or intercept.
+- The current simulator exposes manual playback speeds of 1x, 5x, 10x, and 30x.
+- In Mission play, automatically accelerate only after the player is established on course and no decision is near. Slow back to real time before a transition or intercept.
 - Ask occasional prediction questions only when they teach the next decision, such as what NAV2's CDI should do or when a target radial will be crossed.
 
 The rule is simple: compress low workload, not the navigation logic.
@@ -91,9 +152,9 @@ The visual language should be a simplified VFR sectional, not a street map. It s
 
 - a clean training chart with high contrast and extra labels;
 - a sectional-style chart for normal play;
-- a minimal or blind chart for advanced challenges.
+- a minimal or blind chart for advanced Missions.
 
-Support regional, local, and flight-scale views so a large world remains usable on Mac and iPad. A 500 by 500 NM regional view, a roughly 100 by 100 NM local view, and a close flight view are useful targets, not rigid map sizes.
+The current Myosia chart is 500 NM wide and about 359 NM high, derived from its 1748:1254 artwork aspect ratio. It supports zoom and pan, but it has no separate regional, local, or flight-scale view modes. iPad support remains future work.
 
 ### Fictional first, real-world later
 
@@ -103,38 +164,37 @@ Real-world mode is a later companion, not the core. It needs a maintained data p
 
 ## VOR network and map data
 
-Use nautical-mile coordinates as the authoritative fictional-world coordinate system. The chart artwork is a rendering of this data, not the source of navigation truth. Distances and coverage circles then work directly without pixel conversion.
+The current map data uses normalized coordinates from 0 to 1 relative to the Myosia artwork. `MapView` treats the artwork as 500 NM wide and derives all current distances, VOR reception, coverage rings, flight movement, and Position Challenge scoring from that scale. This is sufficient for the fixed chart, but the artwork and its aspect ratio currently define the coordinate frame.
 
 VOR service volumes should feel plausible and create a useful hierarchy:
 
-| Service volume | Typical simulated range | Place in the world |
+| Service volume | Current simulated range | Place in the world |
 |---|---:|---|
-| High | 120 NM | Major regional navigation hub |
-| Medium | about 80 NM | Regional route station |
+| High | 100 NM | Major regional navigation hub |
 | Low | 40 NM | Local station near an airport, city, or geographic feature |
+| Terminal | 25 NM | Local navigation near a terminal area |
 
-Ranges and restrictions remain configurable per station. Station density should be sparse enough to require planning, but rich enough to offer more than one route in the larger region.
+The current station data contains 77 VORs: 5 High, 28 Low, and 44 Terminal. Each range comes from its service-volume category. Per-station range overrides and restrictions are not implemented.
 
 ```json
 {
   "vors": [
     {
-      "id": "RAV",
-      "name": "Raven",
-      "identifier": "RAV",
-      "frequency": 113.6,
-      "location": { "xNM": 142.5, "yNM": 287.0 },
+      "id": "westmarch",
+      "name": "Westmarch",
+      "identifier": "WES",
+      "frequency": 113.20,
+      "location": { "x": 0.16, "y": 0.46 },
       "type": "VOR",
-      "serviceVolume": "high",
-      "rangeNM": 120,
-      "elevationFT": 1840,
+      "serviceVolume": "H",
+      "elevationFT": 220,
       "dme": false
     }
   ]
 }
 ```
 
-`id` is the internal key. `identifier` is the displayed three-letter station code. The model can later add station restrictions, identification details, magnetic variation rules, and operating status without changing the central design.
+`id` is the internal key. `identifier` is the displayed three-letter station code. `location` is normalized to the chart image. The model can later add per-station range overrides, identification details, magnetic variation rules, and operating status without changing the central design.
 
 ## Terrain, aircraft, and constraints
 
@@ -152,7 +212,9 @@ Each mission generator result must be feasible for the chosen aircraft and const
 
 ## Scoring and debrief
 
-Reaching the destination is necessary, but it is not the whole score. Measure the quality of navigation:
+The current Position Challenge reports only the distance in NM between the player's placed marker and its hidden target. Its reveal shows the target and a dashed line to the guess. Broader scoring and debrief are future work.
+
+For future route and Mission play, reaching the destination is necessary but not the whole score. Measure the quality of navigation:
 
 - radial tracking accuracy;
 - intercept and turn timing;
@@ -162,38 +224,37 @@ Reaching the destination is necessary, but it is not the whole score. Measure th
 - route efficiency and constraint compliance;
 - time, where the mission calls for it.
 
-After a flight, reveal the true track beside the planned route and key instrument events. Explain missed or early transitions in terms of the chart and the indications the player had. This is where mistakes become useful instruction.
+After a future flight, reveal the true track beside the planned route and key instrument events. Explain missed or early transitions in terms of the chart and the indications the player had. This is where mistakes become useful instruction.
 
 ## Technical shape
 
-Build one shared Swift navigation package, independent of SwiftUI and platform presentation. Its responsibilities include navigation math, station data, aircraft state, signal/reception rules, receiver indications, route and mission logic, simulation clock, and scoring.
+The current app is one macOS SwiftUI target. It has no separate shared navigation package and no iPad target. `Simulation/VORNavigation.swift` contains CDI, TO/FROM, station lookup, and distance math; `Simulation/FlightPhysics.swift` advances the plane; and `Simulation/PositionChallenge.swift` creates and scores a hidden position target. `MapView.swift` still owns the live aircraft state, receiver reception checks, coordinate conversion, flight loop, and Position Challenge lifecycle.
 
-The iOS and macOS apps share the package and SwiftUI views where practical, then adapt controls for touch and mouse or keyboard. On iPad, a landscape cockpit can pair chart and instruments. Mac can give the chart more room.
+The receiver UI currently accepts a three-letter station identifier and resolves it to a station. It displays the matching station's frequency as confirmation, rather than tuning a frequency directly. Each receiver has its own identifier and OBS, and can render either a CDI or HSI. DME is present in station data but is not shown or calculated.
+
+As the app grows, keep world and aircraft truth, receiver and instrument logic, Mode visibility and rules, and SwiftUI presentation separate. Extracting a shared package becomes useful when the project has a second platform or enough non-UI logic to exercise independently.
 
 Keep these layers separate:
 
 ```text
 World and aircraft truth
         -> receiver and instrument model
-        -> challenge visibility and rules
+        -> Mode visibility and rules
         -> SwiftUI chart and controls
 ```
 
-The UI asks what NAV1 or NAV2 would show. It does not query the aircraft's position to draw a hidden answer.
+Outside Position Challenge, the map shows and lets the player drag the plane. During Position Challenge, the NAV calculations use a hidden target while the plane icon becomes the player's guess marker; checking the answer reveals the target and the error distance.
 
-## MVP
+## Current implementation
 
-Ship a small complete simulator before building the larger world.
+- One fixed fictional chart, Myosia, with 77 VORs, airports, sightseeing regions, a toggleable grid, zoom, and pan.
+- A heading-based, constant-speed plane simulation with Play and Pause controls plus 1x, 5x, 10x, and 30x playback.
+- Two independent NAV receivers with identifier selection, OBS, CDI or HSI presentation, TO/FROM, and service-volume range handling. The receiver displays the station frequency after identifier selection.
+- A Position Challenge that selects a random target reachable by at least three in-range VORs, accepts a dragged map guess, and reports its error in NM.
+- No radial-intercept mission, route planner, flight plan, persistence, lesson sequence, score beyond position error, debrief, or mode-selection system yet.
+- macOS only.
 
-- One compact fictional chart with 5 to 10 VORs and a destination.
-- A constant-speed, heading-based aircraft simulation.
-- Two independent NAV receivers with frequency tuning, OBS, CDI, TO/FROM, range handling, and station identification.
-- Position Fix missions with a hidden aircraft and a map-tap answer.
-- One-radial intercept and tracking missions.
-- Clear scoring plus an explain/debrief view.
-- A shared core that Mac and iPad both use.
-
-The next release can add a fixed larger region, multi-leg flight plans, NAV2 transition practice, time controls, and procedural missions on the designed network.
+The next work should build on this actual base, not on the earlier compact-chart and cross-platform MVP description.
 
 ## Later work
 
@@ -210,4 +271,3 @@ The next release can add a fixed larger region, multi-leg flight plans, NAV2 tra
 - Do not make NAV2 more capable than the receiver model supports merely to fill downtime.
 - Do not randomise the core geography. Generate missions within a designed world.
 - Do not add flight-simulator complexity unless it creates a navigation decision worth teaching.
-
