@@ -1,0 +1,1 @@
+- 2026-09-17 · BuildPlan · superseded by shipped code — implementation assumptions no longer match

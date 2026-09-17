@@ -1,0 +1,13 @@
+# Private, machine-local project material
+LocalOnly/
+
+# Xcode user and build artifacts
+xcuserdata/
+*.xcuserdatad/
+*.xcuserstate
+DerivedData/
+build/
+*.build/
+
+# macOS Finder metadata
+.DS_Store
