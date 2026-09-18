@@ -22,8 +22,14 @@ struct ContentView: View {
             HomeView(onSelect: { destination = $0 })
         case .freeFlight:
             FreeFlightView(onHome: { destination = .home })
-        case .learn, .practice, .missions:
-            // Learn, Practice, and Missions screens land in Part 2's later tasks.
+        case .learn:
+            ModeListView(title: "Learn",
+                         entries: ["Position Fix", "Radial Intercept and Track"],
+                         onHome: { destination = .home })
+        case .missions:
+            MissionsListView(onHome: { destination = .home })
+        case .practice:
+            // The Practice screen lands in Part 2's next task.
             EmptyView()
         }
     }

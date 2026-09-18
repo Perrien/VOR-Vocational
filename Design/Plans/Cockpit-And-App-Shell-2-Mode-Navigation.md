@@ -146,8 +146,8 @@ one.
 
 | # | Task | Status | Then | Commit | Note |
 |---|---|---|---|---|---|
-| T1 | Build the Home screen and Mode-routing shell | awaiting owner | **owner stop** | commit | |
-| T2 | Build the Learn and Missions unavailable-entry lists | not started | **owner stop** | commit | |
+| T1 | Build the Home screen and Mode-routing shell | completed | **owner stop** | commit | |
+| T2 | Build the Learn and Missions unavailable-entry lists | awaiting owner | **owner stop** | commit | |
 | T3 | Build the Practice list and reintroduce Position Challenge | not started | **owner stop** | commit | |
 | T4 | Close out Part 2 | not started | continue | — | |
 
