@@ -46,6 +46,8 @@ struct MapView: View {
 
     // Map camera: zoom factor and pan offset (in screen points, applied to the
     // scaled map content). `panStart` snapshots the offset when a pan begins.
+    // The supplied crop already provides the default framing. Additional zoom
+    // and pan remain available as interactive camera controls.
     @State private var zoom: CGFloat = 1
     @State private var pan: CGSize = .zero
     @State private var panStart: CGSize?
@@ -74,26 +76,23 @@ struct MapView: View {
     /// The map's real-world height, derived from the artwork's own aspect
     /// ratio so north-south distances use the same NM-per-pixel scale as
     /// east-west ones (see `VORNavigation.distanceNM(fromNormalized:...)`).
-    private var mapHeightNM: Double { mapWidthNM / Double(FlatMap.mapAspect) }
+    private var mapHeightNM: Double { mapWidthNM / Double(FlatMap.sourceMapAspect) }
     private let compassRoseMinZoom: CGFloat = 2
 
     var body: some View {
         GeometryReader { geometry in
             let mapSize = CGSize(width: max(0, geometry.size.width - controlPanelWidth),
                                  height: max(0, geometry.size.height - panelHeight))
-            // The map image is letterboxed (aspect-fit) inside the map area, so
+            // The cropped map image is aspect-fit inside the map area, so
             // everything on the map is positioned relative to this fitted rect.
             let imageRect = FlatMap.fittedRect(in: mapSize)
             let planePos = planePosition ?? CGPoint(x: imageRect.midX, y: imageRect.midY)
 
-            // Compute the normalized plane position relative to imageRect in 0...1
+            // Convert the plane position through the display crop back to the
+            // full-source normalized coordinates used by bundled content.
             let normalizedPlanePosition: CGPoint? = {
-                guard imageRect.width > 0, imageRect.height > 0 else { return nil }
                 guard let planePosition = planePosition else { return nil }
-                let x = (planePosition.x - imageRect.minX) / imageRect.width
-                let y = (planePosition.y - imageRect.minY) / imageRect.height
-                guard (0...1).contains(x), (0...1).contains(y) else { return nil }
-                return CGPoint(x: x, y: y)
+                return FlatMap.sourcePosition(for: planePosition, in: imageRect)
             }()
             // NAV reception/CDI/radials measure against the hidden challenge
             // target while one is active, so dragging the guess marker never
@@ -160,6 +159,9 @@ struct MapView: View {
             // Re-clamp the pan whenever the zoom changes (e.g. via the slider) so
             // the map never drifts off the visible area.
             .onChange(of: zoom) {
+                pan = clampedPan(pan, zoom: zoom, mapSize: mapSize)
+            }
+            .onAppear {
                 pan = clampedPan(pan, zoom: zoom, mapSize: mapSize)
             }
         }
@@ -235,7 +237,8 @@ struct MapView: View {
             if showAirports {
                 ForEach(airports) { airport in
                     AirportMarkerView(airport: airport)
-                        .position(screenPoint(airport.normalizedPosition(in: imageRect), mapSize: mapSize))
+                        .position(screenPoint(point(for: CGPoint(x: airport.x, y: airport.y), in: imageRect),
+                                              mapSize: mapSize))
                 }
             }
 
@@ -256,7 +259,7 @@ struct MapView: View {
             PlaneIcon(heading: heading)
                 .position(screenPoint(planePos, mapSize: mapSize))
                 // The plane's own drag wins over panning when the drag starts on it.
-                .highPriorityGesture(planeDrag(planePos: planePos, mapSize: mapSize))
+                .highPriorityGesture(planeDrag(planePos: planePos, imageRect: imageRect))
 
             FlightTimerView(planePosition: $planePosition,
                             heading: $heading,
@@ -264,7 +267,7 @@ struct MapView: View {
                             isFlying: $isFlying,
                             timeMultiplier: $timeMultiplier,
                             initialPosition: planePos,
-                            mapSize: mapSize,
+                            mapBounds: imageRect,
                             pixelsPerNM: pixelsPerNM(in: imageRect))
 
             // Once checked, show the hidden target and how far the guess was.
@@ -293,8 +296,7 @@ struct MapView: View {
 
     /// The chart's horizontal scale, shared by reception math and flight movement.
     private func pixelsPerNM(in imageRect: CGRect) -> CGFloat {
-        guard imageRect.width > 0 else { return 0 }
-        return imageRect.width / CGFloat(mapWidthNM)
+        FlatMap.pixelsPerNM(in: imageRect, mapWidthNM: mapWidthNM)
     }
 
     /// The radials to draw for the currently tuned radios, in screen space.
@@ -321,7 +323,7 @@ struct MapView: View {
 
     /// Dragging the plane moves it around the map. Translation arrives in the
     /// unscaled map space, so we divide by `zoom` to convert to map coordinates.
-    private func planeDrag(planePos: CGPoint, mapSize: CGSize) -> some Gesture {
+    private func planeDrag(planePos: CGPoint, imageRect: CGRect) -> some Gesture {
         DragGesture(coordinateSpace: .named(mapSpace))
             .onChanged { value in
                 let start = dragStartPosition ?? planePos
@@ -330,7 +332,7 @@ struct MapView: View {
                     x: start.x + value.translation.width / zoom,
                     y: start.y + value.translation.height / zoom
                 )
-                planePosition = clamp(proposed, in: mapSize)
+                planePosition = clamp(proposed, in: imageRect)
             }
             .onEnded { _ in dragStartPosition = nil }
     }
@@ -348,11 +350,11 @@ struct MapView: View {
             .onEnded { _ in panStart = nil }
     }
 
-    /// Keeps the plane's center within the bounds of the map.
-    private func clamp(_ point: CGPoint, in size: CGSize) -> CGPoint {
+    /// Keeps the plane's center within the visible cropped map.
+    private func clamp(_ point: CGPoint, in rect: CGRect) -> CGPoint {
         CGPoint(
-            x: min(max(point.x, 0), size.width),
-            y: min(max(point.y, 0), size.height)
+            x: min(max(point.x, rect.minX), rect.maxX),
+            y: min(max(point.y, rect.minY), rect.maxY)
         )
     }
 
@@ -400,7 +402,9 @@ struct MapView: View {
     /// guess placement.
     private func startChallenge() {
         let target = PositionChallenge.randomTarget(stations: stations, mapWidthNM: mapWidthNM,
-                                                     mapHeightNM: mapHeightNM, minInRangeStations: 3)
+                                                     mapHeightNM: mapHeightNM,
+                                                     normalizedBounds: FlatMap.sourceCrop,
+                                                     minInRangeStations: 3)
         positionChallenge = .active(target: target)
         planePosition = nil
         isFlying = false
@@ -436,7 +440,7 @@ struct MapView: View {
 
     /// Converts a station's service volume into an unscaled map-space radius.
     private func serviceRangeRadius(for station: VORStation, imageRect: CGRect) -> CGFloat {
-        imageRect.width * CGFloat(station.rangeNM / mapWidthNM)
+        CGFloat(station.rangeNM) * pixelsPerNM(in: imageRect)
     }
 
     /// The screen position of a station within the fitted map image.
@@ -446,8 +450,7 @@ struct MapView: View {
 
     /// Converts a normalized map-image coordinate to unscaled map space.
     private func point(for relativePosition: CGPoint, in rect: CGRect) -> CGPoint {
-        CGPoint(x: rect.minX + relativePosition.x * rect.width,
-                y: rect.minY + relativePosition.y * rect.height)
+        FlatMap.point(for: relativePosition, in: rect)
     }
 
     /// Computes the CDI needle deflection and TO/FROM flag for a radio tuned to
@@ -471,7 +474,7 @@ private struct FlightTimerView: View {
     @Binding var timeMultiplier: Double
 
     let initialPosition: CGPoint
-    let mapSize: CGSize
+    let mapBounds: CGRect
     let pixelsPerNM: CGFloat
 
     var body: some View {
@@ -499,9 +502,15 @@ private struct FlightTimerView: View {
 
     private func advancePlane(by elapsed: TimeInterval) {
         let currentPosition = planePosition ?? initialPosition
-        planePosition = FlightPhysics.advance(position: currentPosition, heading: heading,
-                                              speedKnots: speedKnots, elapsed: elapsed * timeMultiplier,
-                                              pixelsPerNM: pixelsPerNM, bounds: mapSize)
+        let localPosition = CGPoint(x: currentPosition.x - mapBounds.minX,
+                                    y: currentPosition.y - mapBounds.minY)
+        let nextLocalPosition = FlightPhysics.advance(position: localPosition, heading: heading,
+                                                       speedKnots: speedKnots,
+                                                       elapsed: elapsed * timeMultiplier,
+                                                       pixelsPerNM: pixelsPerNM,
+                                                       bounds: mapBounds.size)
+        planePosition = CGPoint(x: nextLocalPosition.x + mapBounds.minX,
+                                y: nextLocalPosition.y + mapBounds.minY)
     }
 }
 

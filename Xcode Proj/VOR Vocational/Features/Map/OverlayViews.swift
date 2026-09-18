@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// The map of Myosia: the continent artwork drawn over an ocean fill.
+/// The map of Myosia: a cropped viewport of the continent artwork over an ocean fill.
 ///
-/// The artwork keeps its own aspect ratio (letterboxed inside the map area),
-/// so `fittedRect(in:)` is the single source of truth for where the map sits —
-/// stations and the plane are positioned against that same rect.
+/// The crop affects only presentation. Locations stay normalized to the full
+/// source artwork and are projected through `sourceCrop` when drawn.
 struct FlatMap: View {
     /// The rect the map image occupies within the map area.
     let imageRect: CGRect
@@ -12,11 +11,20 @@ struct FlatMap: View {
     /// The ocean fill shown around the letterboxed map (SVG ocean base #a9c9d4).
     static let oceanColor = Color(red: 169 / 255, green: 201 / 255, blue: 212 / 255)
 
-    // Native pixel dimensions of the source map artwork. Not private: it's
-    // the single source of truth for the artwork's aspect ratio, also needed
-    // to convert normalized map-image coordinates to nautical miles without
-    // any screen geometry (see `MapView.mapHeightNM`).
-    static let mapAspect: CGFloat = 1748.0 / 1254.0
+    /// Native aspect ratio of the uncropped source artwork. This remains the
+    /// calibration basis for the 500-NM-wide navigation world.
+    static let sourceMapAspect: CGFloat = 1748.0 / 1254.0
+
+    /// Presentation crop measured from the supplied red guide: x 178...3118,
+    /// y 264...2036 in the 3496 × 2508 PNG. Edit these normalized values to
+    /// reframe the map without rewriting station, airport, or mission data.
+    static let sourceCrop = CGRect(x: 178.0 / 3496.0,
+                                   y: 264.0 / 2508.0,
+                                   width: 2940.0 / 3496.0,
+                                   height: 1772.0 / 2508.0)
+
+    /// Aspect ratio of the visible crop, not the whole source artwork.
+    static let mapAspect: CGFloat = sourceMapAspect * sourceCrop.width / sourceCrop.height
 
     /// Aspect-fits the map artwork within `area`, centered.
     static func fittedRect(in area: CGSize) -> CGRect {
@@ -33,14 +41,51 @@ struct FlatMap: View {
         )
     }
 
+    /// Projects a full-source normalized coordinate into the cropped image rect.
+    static func point(for sourcePosition: CGPoint, in imageRect: CGRect) -> CGPoint {
+        CGPoint(
+            x: imageRect.minX + (sourcePosition.x - sourceCrop.minX) / sourceCrop.width * imageRect.width,
+            y: imageRect.minY + (sourcePosition.y - sourceCrop.minY) / sourceCrop.height * imageRect.height
+        )
+    }
+
+    /// Converts a position in the cropped image rect back to the full-source
+    /// normalized coordinate that the bundled content uses.
+    static func sourcePosition(for point: CGPoint, in imageRect: CGRect) -> CGPoint? {
+        guard imageRect.width > 0, imageRect.height > 0 else { return nil }
+        let croppedX = (point.x - imageRect.minX) / imageRect.width
+        let croppedY = (point.y - imageRect.minY) / imageRect.height
+        guard (0...1).contains(croppedX), (0...1).contains(croppedY) else { return nil }
+        return CGPoint(x: sourceCrop.minX + croppedX * sourceCrop.width,
+                       y: sourceCrop.minY + croppedY * sourceCrop.height)
+    }
+
+    /// Screen points per nautical mile for the cropped presentation. The world
+    /// itself remains calibrated against the uncropped 500-NM source width.
+    static func pixelsPerNM(in imageRect: CGRect, mapWidthNM: Double) -> CGFloat {
+        guard mapWidthNM > 0 else { return 0 }
+        return imageRect.width / (sourceCrop.width * CGFloat(mapWidthNM))
+    }
+
     var body: some View {
         ZStack {
             FlatMap.oceanColor
 
-            Image("MyosiaMap")
-                .resizable()
-                .frame(width: imageRect.width, height: imageRect.height)
-                .position(x: imageRect.midX, y: imageRect.midY)
+            ZStack {
+                Image("MyosiaMap")
+                    .resizable()
+                    .frame(width: imageRect.width / FlatMap.sourceCrop.width,
+                           height: imageRect.height / FlatMap.sourceCrop.height)
+                    .position(
+                        x: imageRect.width / FlatMap.sourceCrop.width / 2
+                            - FlatMap.sourceCrop.minX * imageRect.width / FlatMap.sourceCrop.width,
+                        y: imageRect.height / FlatMap.sourceCrop.height / 2
+                            - FlatMap.sourceCrop.minY * imageRect.height / FlatMap.sourceCrop.height
+                    )
+            }
+            .frame(width: imageRect.width, height: imageRect.height)
+            .clipped()
+            .position(x: imageRect.midX, y: imageRect.midY)
         }
     }
 }
@@ -59,7 +104,7 @@ struct HexGridOverlay: View {
         Canvas { context, _ in
             guard hexHeightNM > 0, imageRect.width > 0, mapWidthNM > 0 else { return }
 
-            let pixelsPerNM = imageRect.width / CGFloat(mapWidthNM)
+            let pixelsPerNM = FlatMap.pixelsPerNM(in: imageRect, mapWidthNM: mapWidthNM)
             let hexHeight = CGFloat(hexHeightNM) * pixelsPerNM
             let hexRadius = hexHeight / 2
             let hexWidth = sqrt(3) * hexRadius
@@ -136,12 +181,10 @@ struct SightseeingCheckpointsOverlay: View {
 
             for region in regions {
                 for checkpoint in region.checkpoints {
-                    let mapPoint = CGPoint(
-                        x: imageRect.minX + checkpoint.relativePosition.x * imageRect.width,
-                        y: imageRect.minY + checkpoint.relativePosition.y * imageRect.height
-                    )
+                    let mapPoint = FlatMap.point(for: checkpoint.relativePosition, in: imageRect)
                     let center = screenPoint(mapPoint)
-                    let radius = CGFloat(checkpoint.toleranceNM / mapWidthNM) * imageRect.width * zoom
+                    let radius = CGFloat(checkpoint.toleranceNM)
+                        * FlatMap.pixelsPerNM(in: imageRect, mapWidthNM: mapWidthNM) * zoom
                     guard radius > 0 else { continue }
 
                     let circleRect = CGRect(x: center.x - radius,

@@ -23,20 +23,27 @@ enum PositionChallenge {
         case revealed(Result)
     }
 
-    /// A random target in normalized map-image space (0...1), inset from the
-    /// edges so it never lands in a corner, and solvable: reachable by at
+    /// A random target in normalized map-image space, inset from the supplied
+    /// bounds so it never lands in a corner, and solvable: reachable by at
     /// least `minInRangeStations` VORs, so the player always has enough
     /// radials to fix a position (one station only gives a radial, not a
     /// distance). Tries up to `maxAttempts` random candidates and falls back
     /// to the most-reachable one found if none clears the threshold.
     static func randomTarget(stations: [VORStation], mapWidthNM: Double, mapHeightNM: Double,
+                             normalizedBounds: CGRect = CGRect(x: 0, y: 0, width: 1, height: 1),
                              minInRangeStations: Int = 3, inset: Double = 0.1,
                              maxAttempts: Int = 500) -> CGPoint {
-        let range = inset...(1 - inset)
+        guard normalizedBounds.width > 0, normalizedBounds.height > 0 else {
+            return CGPoint(x: 0.5, y: 0.5)
+        }
+        let horizontalInset = normalizedBounds.width * CGFloat(inset)
+        let verticalInset = normalizedBounds.height * CGFloat(inset)
+        let xRange = (normalizedBounds.minX + horizontalInset)...(normalizedBounds.maxX - horizontalInset)
+        let yRange = (normalizedBounds.minY + verticalInset)...(normalizedBounds.maxY - verticalInset)
         var best: (point: CGPoint, count: Int)?
 
         for _ in 0..<maxAttempts {
-            let candidate = CGPoint(x: Double.random(in: range), y: Double.random(in: range))
+            let candidate = CGPoint(x: CGFloat.random(in: xRange), y: CGFloat.random(in: yRange))
             let count = stations.count { station in
                 VORNavigation.distanceNM(fromNormalized: candidate, toNormalized: station.relativePosition,
                                          mapWidthNM: mapWidthNM, mapHeightNM: mapHeightNM)
