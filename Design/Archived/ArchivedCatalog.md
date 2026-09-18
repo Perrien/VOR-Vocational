@@ -1,3 +1,6 @@
 - 2026-09-17 · BuildPlan · superseded by shipped code — implementation assumptions no longer match
 - 2026-09-17 · Chore-Complete-Execution-Protocol · executed
 - 2026-09-18 · V0.1-Stable-Core · executed
+- 2026-09-18 · Cockpit-And-App-Shell · superseded by Cockpit-And-App-Shell-1-Free-Flight-Flight-Deck — tuning input reverted from physical knobs to a typed ident field during that plan's execution
+- 2026-09-18 · Cockpit-And-App-Shell-1-Free-Flight-Flight-Deck · superseded by Cockpit-And-App-Shell-2-Mode-Navigation — ident-typed tuning became range-gated, contradicting this plan's documented range-independent behavior
+- 2026-09-18 · Cockpit-And-App-Shell-2-Mode-Navigation · executed

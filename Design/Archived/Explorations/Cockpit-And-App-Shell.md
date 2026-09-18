@@ -1,3 +1,8 @@
+> **Archived.** This document's S6, I4, I5, U14, and U16 describe NAV radio tuning via separate
+> physical whole-MHz and fine-MHz knobs. Tuning input was reverted to a typed station-ident field
+> during `Cockpit-And-App-Shell-1-Free-Flight-Flight-Deck`'s execution. Trust the code for current
+> behavior.
+
 # Cockpit And App Shell — Exploration
 
 Status: **CLOSED 2026-09-18**

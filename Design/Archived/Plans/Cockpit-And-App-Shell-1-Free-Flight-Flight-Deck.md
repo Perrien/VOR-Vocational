@@ -1,3 +1,8 @@
+> **Archived.** T3's done-when says typing a station's ident tunes its frequency regardless of
+> range — only an unmatched or partial ident leaves the frequency unchanged. During
+> `Cockpit-And-App-Shell-2-Mode-Navigation`, ident-typed tuning became range-gated too: an
+> out-of-range ident now also leaves the frequency unchanged. Trust the code for current behavior.
+
 # Cockpit And App Shell — Part 1: Free Flight Flight Deck
 
 Status: **APPROVED 2026-09-18**
