@@ -20,12 +20,8 @@ struct MapView: View {
     // running offset while dragging.
     @State private var dragStartPosition: CGPoint?
 
-    // Both NAV radios use the same presentation selected in the map panel.
-    @State private var navigationInstrumentStyle: NavigationInstrumentStyle = .cdi
-
     @State private var panStart: CGSize?
 
-    private let panelHeight: CGFloat = 350
     private let controlPanelWidth: CGFloat = 240
     private let minZoom: CGFloat = 1
     private let maxZoom: CGFloat = 6
@@ -39,8 +35,10 @@ struct MapView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let mapSize = CGSize(width: max(0, geometry.size.width - controlPanelWidth),
-                                 height: max(0, geometry.size.height - panelHeight))
+            let mapWidth = max(0, geometry.size.width - controlPanelWidth)
+            let cockpitHeight = CockpitLayout.height(forWidth: mapWidth)
+            let mapSize = CGSize(width: mapWidth,
+                                 height: max(0, geometry.size.height - cockpitHeight))
             // The cropped map image is aspect-fit inside the map area, so
             // everything on the map is positioned relative to this fitted rect.
             let imageRect = FlatMap.fittedRect(in: mapSize)
@@ -52,36 +50,29 @@ struct MapView: View {
                 VStack(spacing: 0) {
                     mapArea(mapSize: mapSize, imageRect: imageRect, planePos: planePos)
 
-                    HStack(spacing: 16) {
+                    CockpitPanel(mapWidth: mapWidth) {
                         PlaneControlView(heading: $session.heading,
                                          speedKnots: $session.speedKnots,
                                          isFlying: $session.isFlying,
                                          timeMultiplier: $session.timeMultiplier,
                                          isChallengeActive: false)
-
+                    } nav1: {
                         NavRadioView(
                             name: "NAV1",
                             ident: receivedIdentBinding(for: .nav1),
                             obs: obsBinding(for: .nav1),
-                            heading: session.heading,
-                            instrumentStyle: navigationInstrumentStyle,
                             tunedStation: nav1Reading.station,
                             reading: { obs in receiverReading(for: session.nav1, obs: obs).cdiReading }
                         )
+                    } nav2: {
                         NavRadioView(
                             name: "NAV2",
                             ident: receivedIdentBinding(for: .nav2),
                             obs: obsBinding(for: .nav2),
-                            heading: session.heading,
-                            instrumentStyle: navigationInstrumentStyle,
                             tunedStation: nav2Reading.station,
                             reading: { obs in receiverReading(for: session.nav2, obs: obs).cdiReading }
                         )
                     }
-                    .padding(16)
-                    .frame(height: panelHeight)
-                    .frame(maxWidth: .infinity)
-                    .background(ControlPalette.panelBackground)
                 }
 
                 MapControlPanel(zoom: $session.zoom, showVORs: $session.showVORs,
@@ -90,7 +81,6 @@ struct MapView: View {
                                 showGrid: $session.showGrid, showSightseeingRegions: $session.showSightseeingRegions,
                                 gridSizeNM: $session.gridSizeNM,
                                 cdiMax: $session.cdiMax,
-                                navigationInstrumentStyle: $navigationInstrumentStyle,
                                 zoomRange: minZoom...maxZoom)
                     .frame(width: controlPanelWidth)
             }
@@ -360,6 +350,62 @@ struct MapView: View {
 
 }
 
+// MARK: - Cockpit
+
+/// The cockpit's shared scale: its bays shrink together to 0.80× at the
+/// enforced 1100×760 window minimum and grow together back to their natural
+/// 1.00× size as the window widens, rather than reflowing into a narrower
+/// arrangement below that size or growing without bound above it.
+private enum CockpitLayout {
+    static let baseWidth: CGFloat = 1075
+    static let baseHeight: CGFloat = 350
+
+    static func scale(forWidth width: CGFloat) -> CGFloat {
+        min(max(width / baseWidth, 0.80), 1.00)
+    }
+
+    static func height(forWidth width: CGFloat) -> CGFloat {
+        baseHeight * scale(forWidth: width)
+    }
+}
+
+/// One continuous dark cockpit panel with three equal bays — Heading, NAV1,
+/// NAV2 — separated by subtle dividers, so the cockpit reads as one
+/// instrument panel rather than three separate dashboard cards.
+private struct CockpitPanel<Heading: View, Nav1: View, Nav2: View>: View {
+    let mapWidth: CGFloat
+    let heading: Heading
+    let nav1: Nav1
+    let nav2: Nav2
+
+    init(mapWidth: CGFloat,
+         @ViewBuilder heading: () -> Heading,
+         @ViewBuilder nav1: () -> Nav1,
+         @ViewBuilder nav2: () -> Nav2) {
+        self.mapWidth = mapWidth
+        self.heading = heading()
+        self.nav1 = nav1()
+        self.nav2 = nav2()
+    }
+
+    private var scale: CGFloat { CockpitLayout.scale(forWidth: mapWidth) }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            heading.frame(maxWidth: .infinity, maxHeight: .infinity)
+            Divider().overlay(ControlPalette.cockpitDivider)
+            nav1.frame(maxWidth: .infinity, maxHeight: .infinity)
+            Divider().overlay(ControlPalette.cockpitDivider)
+            nav2.frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .padding(16)
+        .frame(width: CockpitLayout.baseWidth, height: CockpitLayout.baseHeight)
+        .background(ControlPalette.cockpitBackground)
+        .scaleEffect(scale)
+        .frame(width: mapWidth, height: CockpitLayout.baseHeight * scale)
+    }
+}
+
 /// Advances the plane while flight is enabled. The bindings keep the loop tied
 /// to the latest heading and speed even while the controls are being edited.
 private struct FlightTimerView: View {
@@ -426,7 +472,6 @@ struct MapControlPanel: View {
     @Binding var showSightseeingRegions: Bool
     @Binding var gridSizeNM: Double
     @Binding var cdiMax: Double
-    @Binding var navigationInstrumentStyle: NavigationInstrumentStyle
     let zoomRange: ClosedRange<CGFloat>
 
     @State private var gridSizeText: String = ""
@@ -452,19 +497,6 @@ struct MapControlPanel: View {
             }
 
             CDIMaxField(value: $cdiMax)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Navigation display")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ControlPalette.primaryText)
-                Picker("Navigation display", selection: $navigationInstrumentStyle) {
-                    ForEach(NavigationInstrumentStyle.allCases) { style in
-                        Text(style.displayName).tag(style)
-                    }
-                }
-                .pickerStyle(.radioGroup)
-                .labelsHidden()
-            }
 
             Divider().overlay(ControlPalette.divider)
 

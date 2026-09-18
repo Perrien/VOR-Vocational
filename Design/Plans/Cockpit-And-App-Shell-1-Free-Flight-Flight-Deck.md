@@ -119,7 +119,7 @@ Add pure tests for whole-MHz clamping at 108/117, fine-step wrapping `.00 ↔ .9
 |---|---|---|---|---|---|
 | T1 | Add pure receiver, session, and frequency lookup rules with tests | completed | checkpoint | — | |
 | T2 | Extract the direct-launch reusable Free Flight surface | completed | **owner stop** | commit | |
-| T3 | Build the three-bay physical cockpit and heading controls | not started | **owner stop** | commit | |
+| T3 | Build the three-bay physical cockpit and heading controls | awaiting owner | **owner stop** | commit | |
 | T4 | Add frequency radios, OBS Dials, and NAV swap | not started | **owner stop** | commit | |
 | T5 | Replace the map panel with Chart and Debug diagnostics | not started | **owner stop** | commit + push | |
 | T6 | Close out Part 1 | not started | continue | — | |
@@ -169,6 +169,7 @@ cockpit-flight-deck T2: extract reusable Free Flight session
   - Both NAV bays show the existing CDI-style indicator only. `NavigationInstrumentStyle`, `HSIInstrument`, and the navigation-display picker are removed from production code.
   - Run the project gates required by the protocol.
 - **Do not:** change CDI geometry or TO/FROM logic in `Xcode Proj/VOR Vocational/Domain/Navigation/VORNavigation.swift:19-43` (`static func cdiReading(...)`), add Chart controls, or add a Home control before Part 2.
+- **Material alteration:** the owner asked at this task's stop point to keep `HSIInstrument`'s drawing code rather than delete it outright, since a later part will reintroduce an HSI display option. `HSIInstrument` remains in `PlaneControls.swift` as a self-contained, unreferenced view — not wired into any bay. `NavigationInstrumentStyle` and the navigation-display picker are still deleted; only the drawing struct itself was kept.
 - **Verification handle** — permanent:
   - **Where:** launch direct Free Flight and use the heading bay in the bottom cockpit.
   - **Positive:** rotate the Heading Knob right from `000°` → the Heading Indicator advances clockwise and, after Play, the aircraft travels eastward on the chart; rotate it left → the displayed heading decreases.

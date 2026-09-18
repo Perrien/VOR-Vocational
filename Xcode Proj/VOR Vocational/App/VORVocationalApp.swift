@@ -15,6 +15,7 @@ struct VORVocationalApp: App {
         WindowGroup {
             ContentView()
                 .environment(diagnosticsStore)
+                .frame(minWidth: 1100, minHeight: 760)
         }
     }
 }

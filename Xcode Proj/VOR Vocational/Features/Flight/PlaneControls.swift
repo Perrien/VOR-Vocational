@@ -1,19 +1,5 @@
 import SwiftUI
 
-enum NavigationInstrumentStyle: String, CaseIterable, Identifiable {
-    case cdi
-    case hsi
-
-    var id: Self { self }
-
-    var displayName: String {
-        switch self {
-        case .cdi: return "CDI"
-        case .hsi: return "HSI"
-        }
-    }
-}
-
 enum ControlPalette {
     static let panelBackground = Color(red: 0.88, green: 0.89, blue: 0.91)
     static let cardBackground = Color(red: 0.95, green: 0.96, blue: 0.97)
@@ -23,12 +9,22 @@ enum ControlPalette {
     static let accent = Color(red: 0.00, green: 0.36, blue: 0.25)
     static let divider = Color.black.opacity(0.16)
     static let fieldBorder = Color.black.opacity(0.22)
+
+    // The cockpit reads as one continuous dark instrument panel rather than
+    // light dashboard cards, so its bays use their own dark-ground palette.
+    static let cockpitBackground = Color(red: 0.09, green: 0.10, blue: 0.11)
+    static let cockpitDivider = Color.white.opacity(0.14)
+    static let cockpitText = Color.white.opacity(0.92)
+    static let cockpitSecondaryText = Color.white.opacity(0.55)
+    static let cockpitAccent = Color(red: 0.35, green: 0.90, blue: 0.60)
+    static let cockpitFieldBackground = Color.white.opacity(0.10)
+    static let cockpitFieldBorder = Color.white.opacity(0.28)
 }
 
 // MARK: - Plane Controls
-/// The plane control panel: a heading indicator flanked by press-and-hold turn
-/// buttons. Holding a button rotates the plane continuously; the readout and the
-/// plane icon on the map both follow `heading`.
+/// The heading bay: a heading indicator — with the Heading Knob tucked into
+/// its lower-left corner — above a lower row of evenly spaced, same-height
+/// airspeed, playback, and Play/Pause controls.
 struct PlaneControlView: View {
     @Binding var heading: Double
     @Binding var speedKnots: Double
@@ -47,115 +43,100 @@ struct PlaneControlView: View {
 
     @State private var speedText: String = ""
 
-    // How fast the turn buttons rotate the plane, in degrees per second.
-    private let turnRate: Double = 10
-    private let cardPadding: CGFloat = 12
-    private let contentSpacing: CGFloat = 14
-    private let headingReadoutWidth: CGFloat = 50
-    private let speedControlsWidth: CGFloat = 104
+    private let contentSpacing: CGFloat = 10
+    private let lowerRowHeight: CGFloat = 58
+    // Every lower-row control shares this height, regardless of whether it
+    // carries a caption above it, so the row reads as one aligned set.
+    private let controlHeight: CGFloat = 32
 
     var body: some View {
         GeometryReader { geometry in
             let diameter = dialDiameter(in: geometry.size)
             let radius = diameter / 2
-            let turnButtonSize = diameter * (34 / 150)
-            let turnButtonInset = diameter * (6 / 150)
+            // The knob keeps the same size/inset ratio the old corner turn
+            // buttons used in this exact spot.
+            let knobDiameter = diameter * (34 / 150)
+            let knobInset = diameter * (6 / 150)
 
-            VStack(spacing: 10) {
-                HStack(spacing: contentSpacing) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("PLANE")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(ControlPalette.accent)
+            VStack(spacing: contentSpacing) {
+                if diameter > 0 {
+                    ZStack {
+                        HeadingIndicator(heading: heading, diameter: diameter)
+                        HeadingKnob(heading: $heading, diameter: knobDiameter)
+                            .offset(x: -radius + knobInset, y: radius - knobInset)
+                    }
+                }
 
-                        Text("HDG")
+                HStack(alignment: .bottom, spacing: 18) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("SPD")
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(ControlPalette.accent)
-
-                        Text(String(format: "%03d°", displayHeading))
-                            .font(.title2.monospacedDigit().weight(.medium))
-                            .foregroundStyle(ControlPalette.accent)
-                            .lineLimit(1)
-                            .fixedSize()
-
-                        //Spacer(minLength: 0)
-
-                        Text("SPEED")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(ControlPalette.secondaryText)
-
-                        HStack(spacing: 4) {
+                            .foregroundStyle(ControlPalette.cockpitSecondaryText)
+                        HStack(spacing: 6) {
                             TextField("120", text: $speedText)
                                 .textFieldStyle(.plain)
-                                .font(.title2.monospacedDigit().weight(.medium))
-                                .foregroundStyle(ControlPalette.accent)
-                                .frame(width: 62)
+                                .multilineTextAlignment(.center)
+                                .font(.callout.monospacedDigit().weight(.medium))
+                                .foregroundStyle(ControlPalette.cockpitText)
                                 .padding(.horizontal, 6)
-                                .padding(.vertical, 4)
-                                .background(ControlPalette.fieldBackground, in: RoundedRectangle(cornerRadius: 6))
+                                .frame(width: 52, height: controlHeight)
+                                .background(ControlPalette.cockpitFieldBackground, in: RoundedRectangle(cornerRadius: 6))
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 6)
-                                        .stroke(ControlPalette.fieldBorder, lineWidth: 1)
+                                        .stroke(ControlPalette.cockpitFieldBorder, lineWidth: 1)
                                 )
-
                             Text("KTS")
-                                .font(.caption.monospacedDigit())
-                                .foregroundStyle(ControlPalette.secondaryText)
+                                .font(.caption2.monospacedDigit())
+                                .foregroundStyle(ControlPalette.cockpitSecondaryText)
                         }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                        Button {
-                            isFlying.toggle()
-                        } label: {
-                            Label(isFlying ? "Pause" : "Play",
-                                  systemImage: isFlying ? "pause.fill" : "play.fill")
-                                .frame(minWidth: 82)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(isFlying ? .orange : .green)
-                        .keyboardShortcut(.space, modifiers: [])
-                        .disabled(isChallengeActive)
-                        
-                        Spacer()
-
+                    VStack(alignment: .leading, spacing: 4) {
                         Text("PLAYBACK")
                             .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(ControlPalette.secondaryText)
-
+                            .foregroundStyle(ControlPalette.cockpitSecondaryText)
                         Picker("Playback speed", selection: $timeMultiplier) {
                             ForEach(Self.timeMultiplierOptions, id: \.self) { multiplier in
-                                Text("\(Int(multiplier))×").tag(multiplier)
+                                Text("\(Int(multiplier))×")
+                                    .foregroundStyle(ControlPalette.cockpitText)
+                                    .tag(multiplier)
                             }
                         }
                         .pickerStyle(.menu)
                         .labelsHidden()
-                        .frame(width: speedControlsWidth, alignment: .leading)
+                        .tint(ControlPalette.cockpitText)
+                        .padding(.horizontal, 6)
+                        .frame(width: 96, height: controlHeight)
+                        .background(ControlPalette.cockpitFieldBackground, in: RoundedRectangle(cornerRadius: 6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(ControlPalette.cockpitFieldBorder, lineWidth: 1)
+                        )
                     }
-                    .frame(width: speedControlsWidth, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-                    if diameter > 0 {
-                        ZStack {
-                            HeadingIndicator(heading: heading, diameter: diameter)
-
-                            // Turn buttons tuck into the lower corners of the dial.
-                            HoldTurnButton(systemImage: "arrow.counterclockwise", size: turnButtonSize) { dt in
-                                turn(by: -turnRate * dt)
-                            }
-                            .offset(x: -radius + turnButtonInset, y: radius - turnButtonInset)
-
-                            HoldTurnButton(systemImage: "arrow.clockwise", size: turnButtonSize) { dt in
-                                turn(by: turnRate * dt)
-                            }
-                            .offset(x: radius - turnButtonInset, y: radius - turnButtonInset)
-                        }
+                    Button {
+                        isFlying.toggle()
+                    } label: {
+                        Label(isFlying ? "Pause" : "Play",
+                              systemImage: isFlying ? "pause.fill" : "play.fill")
+                            .font(.callout.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: controlHeight)
+                            .background(isFlying ? Color.orange : Color.green, in: RoundedRectangle(cornerRadius: 6))
+                            .opacity(isChallengeActive ? 0.5 : 1)
                     }
+                    .buttonStyle(.plain)
+                    .keyboardShortcut(.space, modifiers: [])
+                    .disabled(isChallengeActive)
+                    .frame(maxWidth: .infinity)
                 }
-
-
+                .frame(height: lowerRowHeight)
             }
-            .padding(cardPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(ControlPalette.cardBackground, in: RoundedRectangle(cornerRadius: 10))
         .onAppear {
             speedText = formattedSpeed(speedKnots)
         }
@@ -173,27 +154,11 @@ struct PlaneControlView: View {
         }
     }
 
-    /// Uses the smaller of the usable card height and the horizontal room left
-    /// after the heading and speed controls. This lets the dial follow panel
-    /// resizing without overlapping either control column.
-    private func dialDiameter(in cardSize: CGSize) -> CGFloat {
-        let usableHeight = max(0, cardSize.height - cardPadding * 2)
-        let usableWidth = max(0, cardSize.width - cardPadding * 2)
-        let widthForDial = max(0, usableWidth - headingReadoutWidth - speedControlsWidth - contentSpacing * 2)
-        return min(usableHeight, widthForDial)
-    }
-
-    /// The heading rounded to whole degrees for display (360 instead of 0).
-    private var displayHeading: Int {
-        let rounded = Int(heading.rounded()) % 360
-        return rounded == 0 ? 360 : rounded
-    }
-
-    /// Rotates the plane by `delta` degrees, wrapping into 0..<360.
-    private func turn(by delta: Double) {
-        var next = (heading + delta).truncatingRemainder(dividingBy: 360)
-        if next < 0 { next += 360 }
-        heading = next
+    /// The dial fills the width, bounded by the height left over above the
+    /// fixed-height lower control row.
+    private func dialDiameter(in size: CGSize) -> CGFloat {
+        let usableHeight = max(0, size.height - lowerRowHeight - contentSpacing)
+        return min(size.width, usableHeight)
     }
 
     private func formattedSpeed(_ speed: Double) -> String {
@@ -239,49 +204,91 @@ struct HeadingIndicator: View {
     }
 }
 
-/// A round button that repeatedly invokes `onTick` while held down, passing the
-/// elapsed time (seconds) since the last tick so callers can turn at a steady rate.
-struct HoldTurnButton: View {
-    let systemImage: String
-    var size: CGFloat = 34
-    let onTick: (Double) -> Void
+/// A physical-looking rotary knob for the heading bay. Turning it clockwise
+/// raises the wrapped heading; counter-clockwise lowers it. Mirrors
+/// `OBSInstrument.rotationDrag`, but rounds its accumulated angular delta to
+/// whole degrees before applying it, since heading has no fractional display.
+struct HeadingKnob: View {
+    @Binding var heading: Double
+    var diameter: CGFloat = 40
 
-    @State private var task: Task<Void, Never>?
+    @State private var lastDragAngle: Double?
+    @State private var accumulatedDelta: Double = 0
+
+    private var radius: CGFloat { diameter / 2 }
 
     var body: some View {
-        Image(systemName: systemImage)
-            .font(.system(size: size * 0.5, weight: .bold))
-            .foregroundStyle(.white)
-            .frame(width: size, height: size)
-            .background(Color.orange, in: Circle())
-            .overlay(Circle().stroke(.white.opacity(0.5), lineWidth: 1))
-            .contentShape(Circle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { _ in if task == nil { startTurning() } }
-                    .onEnded { _ in stopTurning() }
-            )
+        ZStack {
+            Circle()
+                .fill(Color.gray.opacity(0.35))
+                .overlay(Circle().stroke(ControlPalette.cockpitFieldBorder, lineWidth: 1))
+
+            ForEach(0..<8, id: \.self) { index in
+                Capsule()
+                    .fill(ControlPalette.cockpitSecondaryText)
+                    .frame(width: 2, height: diameter * 0.16)
+                    .offset(y: -radius + diameter * 0.10)
+                    .rotationEffect(.degrees(Double(index) * 45))
+            }
+
+            Image(systemName: "arrowtriangle.up.fill")
+                .font(.system(size: 9))
+                .foregroundStyle(ControlPalette.cockpitAccent)
+                .offset(y: -radius + 4)
+        }
+        .frame(width: diameter, height: diameter)
+        .contentShape(Circle())
+        .gesture(rotationDrag)
+        .background(
+            ScrollWheelReader { deltaY in
+                accumulate(Double(deltaY))
+            }
+        )
     }
 
-    private func startTurning() {
-        task = Task { @MainActor in
-            let dt = 1.0 / 60.0
-            while !Task.isCancelled {
-                onTick(dt)
-                try? await Task.sleep(nanoseconds: 16_000_000)
+    private var rotationDrag: some Gesture {
+        DragGesture(minimumDistance: 0)
+            .onChanged { value in
+                let center = CGPoint(x: radius, y: radius)
+                let angle = atan2(value.location.y - center.y,
+                                  value.location.x - center.x) * 180 / .pi
+                if let last = lastDragAngle {
+                    var delta = angle - last
+                    if delta > 180 { delta -= 360 }
+                    if delta < -180 { delta += 360 }
+                    accumulate(delta)
+                }
+                lastDragAngle = angle
             }
+            .onEnded { _ in
+                lastDragAngle = nil
+                accumulatedDelta = 0
+            }
+    }
+
+    /// Accumulates a fractional angular delta from either the drag gesture or
+    /// the scroll wheel, applying whole-degree turns as they cross and
+    /// carrying any leftover fraction forward so slow input isn't dropped.
+    private func accumulate(_ delta: Double) {
+        accumulatedDelta += delta
+        let wholeDegrees = accumulatedDelta.rounded(.towardZero)
+        if wholeDegrees != 0 {
+            turn(by: wholeDegrees)
+            accumulatedDelta -= wholeDegrees
         }
     }
 
-    private func stopTurning() {
-        task?.cancel()
-        task = nil
+    /// Rotates the plane by `delta` degrees, wrapping into 0..<360.
+    private func turn(by delta: Double) {
+        var next = (heading + delta).truncatingRemainder(dividingBy: 360)
+        if next < 0 { next += 360 }
+        heading = next
     }
 }
 
 // MARK: - Radios
 
-/// A single tunable NAV radio paired with its OBS/CDI instrument.
+/// A single tunable NAV radio paired with its CDI-style VOR indicator.
 ///
 /// Tuning is done by typing a station identifier (e.g. "CTR"); when it matches a
 /// beacon, the radio locks on and shows the station's frequency as confirmation.
@@ -289,8 +296,6 @@ struct NavRadioView: View {
     let name: String
     @Binding var ident: String
     @Binding var obs: Double
-    let heading: Double
-    let instrumentStyle: NavigationInstrumentStyle
     /// The beacon the typed identifier resolves to, or `nil` if none matches.
     let tunedStation: VORStation?
     /// Resolves the CDI reading for a given OBS setting.
@@ -309,56 +314,50 @@ struct NavRadioView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(name)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(ControlPalette.secondaryText)
+                        .foregroundStyle(ControlPalette.cockpitSecondaryText)
 
                     Text("IDENT")
                         .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(ControlPalette.secondaryText)
+                        .foregroundStyle(ControlPalette.cockpitSecondaryText)
 
                     TextField("---", text: identText)
                         .textFieldStyle(.plain)
                         .autocorrectionDisabled()
                         .font(.title2.monospaced().weight(.semibold))
-                        .foregroundStyle(ControlPalette.accent)
+                        .foregroundStyle(ControlPalette.cockpitAccent)
                         .frame(width: 88)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(ControlPalette.fieldBackground, in: RoundedRectangle(cornerRadius: 6))
+                        .background(ControlPalette.cockpitFieldBackground, in: RoundedRectangle(cornerRadius: 6))
                         .overlay(
                             RoundedRectangle(cornerRadius: 6)
-                                .stroke(isTuned ? ControlPalette.accent.opacity(0.7) : ControlPalette.fieldBorder, lineWidth: 1)
+                                .stroke(isTuned ? ControlPalette.cockpitAccent.opacity(0.7) : ControlPalette.cockpitFieldBorder, lineWidth: 1)
                         )
 
                     Text(tunedStation.map { "\($0.frequencyLabel) MHz" } ?? "--- MHz")
                         .font(.caption.monospacedDigit())
-                        .foregroundStyle(isTuned ? ControlPalette.accent : ControlPalette.secondaryText)
+                        .foregroundStyle(isTuned ? ControlPalette.cockpitAccent : ControlPalette.cockpitSecondaryText)
 
                     Label(isTuned ? "Station tuned" : "No station",
                           systemImage: isTuned ? "dot.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right.slash")
                         .font(.caption2)
-                        .foregroundStyle(isTuned ? Color(red: 0.00, green: 0.38, blue: 0.48) : ControlPalette.secondaryText)
+                        .foregroundStyle(isTuned ? Color(red: 0.40, green: 0.80, blue: 0.95) : ControlPalette.cockpitSecondaryText)
 
                     Text(String(format: "CRS %03d°", displayCourse))
                         .font(.caption.monospacedDigit())
-                        .foregroundStyle(ControlPalette.primaryText)
+                        .foregroundStyle(ControlPalette.cockpitText)
 
                     Spacer(minLength: 0)
                 }
                 .frame(width: radioDetailsWidth, alignment: .leading)
 
                 if diameter > 0 {
-                    switch instrumentStyle {
-                    case .cdi:
-                        OBSInstrument(obs: $obs, reading: reading(obs), diameter: diameter)
-                    case .hsi:
-                        HSIInstrument(heading: heading, obs: $obs, reading: reading(obs), diameter: diameter)
-                    }
+                    OBSInstrument(obs: $obs, reading: reading(obs), diameter: diameter)
                 }
             }
             .padding(cardPadding)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(ControlPalette.cardBackground, in: RoundedRectangle(cornerRadius: 10))
     }
 
     /// The CDI uses every point of vertical space that its card permits, capped
@@ -681,6 +680,11 @@ struct OBSInstrument: View {
 /// An HSI combines the plane heading with the selected VOR course. The yellow
 /// course arrow shows the OBS setting. Its smaller companion changes between
 /// the selected course and its reciprocal to show TO versus FROM.
+///
+/// V0.2 standardizes both NAV bays on `OBSInstrument` and doesn't wire this
+/// view into any bay, but keeps it as a self-contained drawing so a later
+/// part can reintroduce an HSI display option without redrawing it from
+/// scratch.
 struct HSIInstrument: View {
     let heading: Double
     @Binding var obs: Double
@@ -760,7 +764,6 @@ struct HSIInstrument: View {
             ForEach(-5...5, id: \.self) { index in
                 Circle()
                     .fill(.white.opacity(index == 0 ? 1 : 0.85))
-                    //.frame(width: 3 * scale, height: 3 * scale)
                     .frame(width: (index == 0 ? 4 : 3) * scale, height: (index == 0 ? 4 : 3) * scale)
                     .offset(x: CGFloat(index) * deviationTickSpacing)
             }
