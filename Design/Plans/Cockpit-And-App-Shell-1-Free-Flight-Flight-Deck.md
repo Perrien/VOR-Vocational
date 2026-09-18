@@ -122,7 +122,7 @@ Add pure tests for whole-MHz clamping at 108/117, fine-step wrapping `.00 ↔ .9
 | T3 | Build the three-bay physical cockpit and heading controls | completed | **owner stop** | commit | |
 | T4 | Add frequency radios, OBS Dials, and NAV swap | completed | **owner stop** | commit | |
 | T5 | Replace the map panel with Chart and Debug diagnostics | completed | **owner stop** | commit + push | |
-| T6 | Close out Part 1 | awaiting owner | continue | — | |
+| T6 | Close out Part 1 | completed | continue | — | |
 
 **T1 — Add pure receiver, session, and frequency lookup rules with tests**
 
