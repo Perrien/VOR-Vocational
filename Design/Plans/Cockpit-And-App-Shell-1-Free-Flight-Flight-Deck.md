@@ -121,8 +121,8 @@ Add pure tests for whole-MHz clamping at 108/117, fine-step wrapping `.00 ↔ .9
 | T2 | Extract the direct-launch reusable Free Flight surface | completed | **owner stop** | commit | |
 | T3 | Build the three-bay physical cockpit and heading controls | completed | **owner stop** | commit | |
 | T4 | Add frequency radios, OBS Dials, and NAV swap | completed | **owner stop** | commit | |
-| T5 | Replace the map panel with Chart and Debug diagnostics | awaiting owner | **owner stop** | commit + push | |
-| T6 | Close out Part 1 | not started | continue | — | |
+| T5 | Replace the map panel with Chart and Debug diagnostics | completed | **owner stop** | commit + push | |
+| T6 | Close out Part 1 | awaiting owner | continue | — | |
 
 **T1 — Add pure receiver, session, and frequency lookup rules with tests**
 
