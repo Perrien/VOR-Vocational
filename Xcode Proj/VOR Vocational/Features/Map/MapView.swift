@@ -50,7 +50,7 @@ struct MapView: View {
                 VStack(spacing: 0) {
                     mapArea(mapSize: mapSize, imageRect: imageRect, planePos: planePos)
 
-                    CockpitPanel(mapWidth: mapWidth) {
+                    CockpitPanel(mapWidth: mapWidth, onSwap: { session.swapNAVReceivers() }) {
                         PlaneControlView(heading: $session.heading,
                                          speedKnots: $session.speedKnots,
                                          isFlying: $session.isFlying,
@@ -59,18 +59,16 @@ struct MapView: View {
                     } nav1: {
                         NavRadioView(
                             name: "NAV1",
-                            ident: receivedIdentBinding(for: .nav1),
-                            obs: obsBinding(for: .nav1),
-                            tunedStation: nav1Reading.station,
-                            reading: { obs in receiverReading(for: session.nav1, obs: obs).cdiReading }
+                            receiver: $session.nav1,
+                            stations: stations,
+                            reading: nav1Reading.cdiReading
                         )
                     } nav2: {
                         NavRadioView(
                             name: "NAV2",
-                            ident: receivedIdentBinding(for: .nav2),
-                            obs: obsBinding(for: .nav2),
-                            tunedStation: nav2Reading.station,
-                            reading: { obs in receiverReading(for: session.nav2, obs: obs).cdiReading }
+                            receiver: $session.nav2,
+                            stations: stations,
+                            reading: nav2Reading.cdiReading
                         )
                     }
                 }
@@ -293,43 +291,15 @@ struct MapView: View {
         session.zoom = min(max(session.zoom * factor, minZoom), maxZoom)
     }
 
-    private enum Receiver { case nav1, nav2 }
-
-    private func receiverReading(for receiver: NAVReceiver, obs: Double? = nil) -> ReceiverReading {
+    private func receiverReading(for receiver: NAVReceiver) -> ReceiverReading {
         VORNavigation.receiverReading(
             frequencyHundredths: receiver.frequencyHundredths,
-            obs: Int((obs ?? Double(receiver.obs)).rounded()),
+            obs: receiver.obs,
             normalizedAircraftPosition: session.normalizedAircraftPosition,
             stations: stations,
             mapWidthNM: mapWidthNM,
             mapHeightNM: mapHeightNM,
             cdiMax: session.cdiMax
-        )
-    }
-
-    private func obsBinding(for receiver: Receiver) -> Binding<Double> {
-        Binding(
-            get: { Double(receiver == .nav1 ? session.nav1.obs : session.nav2.obs) },
-            set: { newValue in
-                let value = Int(newValue.rounded()).quotientAndRemainder(dividingBy: 360).remainder
-                if receiver == .nav1 {
-                    session.nav1.obs = value < 0 ? value + 360 : value
-                } else {
-                    session.nav2.obs = value < 0 ? value + 360 : value
-                }
-            }
-        )
-    }
-
-    /// The legacy radio view remains until T4 adds frequency knobs. Its
-    /// identifier display derives from reception and never stores an ident.
-    private func receivedIdentBinding(for receiver: Receiver) -> Binding<String> {
-        Binding(
-            get: {
-                let navReceiver = receiver == .nav1 ? session.nav1 : session.nav2
-                return receiverReading(for: navReceiver).station?.ident ?? ""
-            },
-            set: { _ in }
         )
     }
 
@@ -374,15 +344,18 @@ private enum CockpitLayout {
 /// instrument panel rather than three separate dashboard cards.
 private struct CockpitPanel<Heading: View, Nav1: View, Nav2: View>: View {
     let mapWidth: CGFloat
+    let onSwap: () -> Void
     let heading: Heading
     let nav1: Nav1
     let nav2: Nav2
 
     init(mapWidth: CGFloat,
+         onSwap: @escaping () -> Void,
          @ViewBuilder heading: () -> Heading,
          @ViewBuilder nav1: () -> Nav1,
          @ViewBuilder nav2: () -> Nav2) {
         self.mapWidth = mapWidth
+        self.onSwap = onSwap
         self.heading = heading()
         self.nav1 = nav1()
         self.nav2 = nav2()
@@ -396,6 +369,8 @@ private struct CockpitPanel<Heading: View, Nav1: View, Nav2: View>: View {
             Divider().overlay(ControlPalette.cockpitDivider)
             nav1.frame(maxWidth: .infinity, maxHeight: .infinity)
             Divider().overlay(ControlPalette.cockpitDivider)
+            swapControl
+            Divider().overlay(ControlPalette.cockpitDivider)
             nav2.frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding(16)
@@ -403,6 +378,22 @@ private struct CockpitPanel<Heading: View, Nav1: View, Nav2: View>: View {
         .background(ControlPalette.cockpitBackground)
         .scaleEffect(scale)
         .frame(width: mapWidth, height: CockpitLayout.baseHeight * scale)
+    }
+
+    /// The dedicated NAV1 ↔ NAV2 control: swaps complete receiver values only,
+    /// with no other side effect.
+    private var swapControl: some View {
+        Button(action: onSwap) {
+            Image(systemName: "arrow.left.arrow.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(ControlPalette.cockpitText)
+                .frame(width: 28, height: 28)
+                .background(ControlPalette.cockpitFieldBackground, in: Circle())
+                .overlay(Circle().stroke(ControlPalette.cockpitFieldBorder, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 8)
+        .help("Swap NAV1 and NAV2 frequencies and OBS")
     }
 }
 

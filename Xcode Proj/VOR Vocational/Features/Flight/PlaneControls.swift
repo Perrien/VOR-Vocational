@@ -62,7 +62,7 @@ struct PlaneControlView: View {
                 if diameter > 0 {
                     ZStack {
                         HeadingIndicator(heading: heading, diameter: diameter)
-                        HeadingKnob(heading: $heading, diameter: knobDiameter)
+                        RotaryKnob(value: $heading, diameter: knobDiameter)
                             .offset(x: -radius + knobInset, y: radius - knobInset)
                     }
                 }
@@ -204,12 +204,12 @@ struct HeadingIndicator: View {
     }
 }
 
-/// A physical-looking rotary knob for the heading bay. Turning it clockwise
-/// raises the wrapped heading; counter-clockwise lowers it. Mirrors
-/// `OBSInstrument.rotationDrag`, but rounds its accumulated angular delta to
-/// whole degrees before applying it, since heading has no fractional display.
-struct HeadingKnob: View {
-    @Binding var heading: Double
+/// A physical-looking rotary knob that turns a wrapped 0..<360 value 1:1 with
+/// drag rotation or scroll input, rounding its accumulated delta to whole
+/// degrees before applying it. Shared by the heading bay's Heading Knob and
+/// each NAV bay's OBS Dial — both turn a wrapped-degree value the same way.
+struct RotaryKnob: View {
+    @Binding var value: Double
     var diameter: CGFloat = 40
 
     @State private var lastDragAngle: Double?
@@ -223,18 +223,23 @@ struct HeadingKnob: View {
                 .fill(Color.gray.opacity(0.35))
                 .overlay(Circle().stroke(ControlPalette.cockpitFieldBorder, lineWidth: 1))
 
-            ForEach(0..<8, id: \.self) { index in
-                Capsule()
-                    .fill(ControlPalette.cockpitSecondaryText)
-                    .frame(width: 2, height: diameter * 0.16)
-                    .offset(y: -radius + diameter * 0.10)
-                    .rotationEffect(.degrees(Double(index) * 45))
-            }
+            // The knurling and pointer turn together with `value`, so the
+            // knob visually shows its current position like a physical dial.
+            ZStack {
+                ForEach(0..<8, id: \.self) { index in
+                    Capsule()
+                        .fill(ControlPalette.cockpitSecondaryText)
+                        .frame(width: 2, height: diameter * 0.16)
+                        .offset(y: -radius + diameter * 0.10)
+                        .rotationEffect(.degrees(Double(index) * 45))
+                }
 
-            Image(systemName: "arrowtriangle.up.fill")
-                .font(.system(size: 9))
-                .foregroundStyle(ControlPalette.cockpitAccent)
-                .offset(y: -radius + 4)
+                Image(systemName: "arrowtriangle.up.fill")
+                    .font(.system(size: 9))
+                    .foregroundStyle(ControlPalette.cockpitAccent)
+                    .offset(y: -radius + 4)
+            }
+            .rotationEffect(.degrees(value))
         }
         .frame(width: diameter, height: diameter)
         .contentShape(Circle())
@@ -248,10 +253,10 @@ struct HeadingKnob: View {
 
     private var rotationDrag: some Gesture {
         DragGesture(minimumDistance: 0)
-            .onChanged { value in
+            .onChanged { dragValue in
                 let center = CGPoint(x: radius, y: radius)
-                let angle = atan2(value.location.y - center.y,
-                                  value.location.x - center.x) * 180 / .pi
+                let angle = atan2(dragValue.location.y - center.y,
+                                  dragValue.location.x - center.x) * 180 / .pi
                 if let last = lastDragAngle {
                     var delta = angle - last
                     if delta > 180 { delta -= 360 }
@@ -278,112 +283,127 @@ struct HeadingKnob: View {
         }
     }
 
-    /// Rotates the plane by `delta` degrees, wrapping into 0..<360.
+    /// Rotates the value by `delta` degrees, wrapping into 0..<360.
     private func turn(by delta: Double) {
-        var next = (heading + delta).truncatingRemainder(dividingBy: 360)
+        var next = (value + delta).truncatingRemainder(dividingBy: 360)
         if next < 0 { next += 360 }
-        heading = next
+        value = next
     }
 }
 
 // MARK: - Radios
 
-/// A single tunable NAV radio paired with its CDI-style VOR indicator.
+/// A NAV bay: a CDI-style VOR indicator whose course is set by dragging the
+/// indicator itself, above the receiver label, an editable ident field, and
+/// the tuned frequency.
 ///
-/// Tuning is done by typing a station identifier (e.g. "CTR"); when it matches a
-/// beacon, the radio locks on and shows the station's frequency as confirmation.
+/// Typing a station's ident (e.g. "CTR") tunes the receiver to that station's
+/// frequency and turns the frequency green; an unmatched or partial ident
+/// leaves the current frequency untouched and displayed in its normal color.
 struct NavRadioView: View {
     let name: String
-    @Binding var ident: String
-    @Binding var obs: Double
-    /// The beacon the typed identifier resolves to, or `nil` if none matches.
-    let tunedStation: VORStation?
-    /// Resolves the CDI reading for a given OBS setting.
-    let reading: (Double) -> CDIReading
+    @Binding var receiver: NAVReceiver
+    /// All bundled stations, used to resolve a typed ident regardless of
+    /// current reception range — separate from `reading`, which is range-gated.
+    let stations: [VORStation]
+    /// The CDI reading for the receiver's current frequency and OBS.
+    let reading: CDIReading
 
-    private var isTuned: Bool { tunedStation != nil }
-    private let cardPadding: CGFloat = 12
-    private let contentSpacing: CGFloat = 14
-    private let radioDetailsWidth: CGFloat = 104
+    @State private var identText: String = ""
+
+    private var matchedStation: VORStation? {
+        VORNavigation.station(withIdent: identText, in: stations)
+    }
+    private var isValid: Bool { matchedStation != nil }
+
+    private let contentSpacing: CGFloat = 10
+    private let lowerRowHeight: CGFloat = 58
 
     var body: some View {
         GeometryReader { geometry in
             let diameter = dialDiameter(in: geometry.size)
 
-            HStack(spacing: contentSpacing) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(name)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ControlPalette.cockpitSecondaryText)
+            VStack(spacing: contentSpacing) {
+                if diameter > 0 {
+                    OBSInstrument(obs: obsBinding, reading: reading, diameter: diameter)
+                }
 
-                    Text("IDENT")
+                VStack(spacing: 6) {
+                    Text(name)
                         .font(.system(size: 9, weight: .semibold))
                         .foregroundStyle(ControlPalette.cockpitSecondaryText)
 
-                    TextField("---", text: identText)
-                        .textFieldStyle(.plain)
-                        .autocorrectionDisabled()
-                        .font(.title2.monospaced().weight(.semibold))
-                        .foregroundStyle(ControlPalette.cockpitAccent)
-                        .frame(width: 88)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(ControlPalette.cockpitFieldBackground, in: RoundedRectangle(cornerRadius: 6))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(isTuned ? ControlPalette.cockpitAccent.opacity(0.7) : ControlPalette.cockpitFieldBorder, lineWidth: 1)
-                        )
+                    HStack(spacing: 0) {
+                        Spacer()
 
-                    Text(tunedStation.map { "\($0.frequencyLabel) MHz" } ?? "--- MHz")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(isTuned ? ControlPalette.cockpitAccent : ControlPalette.cockpitSecondaryText)
+                        TextField("---", text: identTextBinding)
+                            .textFieldStyle(.plain)
+                            .autocorrectionDisabled()
+                            .multilineTextAlignment(.center)
+                            .font(.title3.monospaced().weight(.semibold))
+                            .foregroundStyle(ControlPalette.cockpitAccent)
+                            .frame(width: 80, height: 32)
+                            .background(ControlPalette.cockpitFieldBackground, in: RoundedRectangle(cornerRadius: 6))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(isValid ? ControlPalette.cockpitAccent.opacity(0.7) : ControlPalette.cockpitFieldBorder, lineWidth: 1)
+                            )
 
-                    Label(isTuned ? "Station tuned" : "No station",
-                          systemImage: isTuned ? "dot.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right.slash")
-                        .font(.caption2)
-                        .foregroundStyle(isTuned ? Color(red: 0.40, green: 0.80, blue: 0.95) : ControlPalette.cockpitSecondaryText)
+                        Spacer()
 
-                    Text(String(format: "CRS %03d°", displayCourse))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(ControlPalette.cockpitText)
+                        Text(receiver.frequencyLabel)
+                            .font(.title3.monospacedDigit().weight(.semibold))
+                            .foregroundStyle(isValid ? ControlPalette.cockpitAccent : ControlPalette.cockpitText)
 
-                    Spacer(minLength: 0)
+                        Spacer()
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(width: radioDetailsWidth, alignment: .leading)
-
-                if diameter > 0 {
-                    OBSInstrument(obs: $obs, reading: reading(obs), diameter: diameter)
-                }
+                .frame(height: lowerRowHeight)
+                .frame(maxWidth: .infinity)
             }
-            .padding(cardPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { syncIdentFromReceiver() }
+        .onChange(of: receiver.frequencyHundredths) { _, _ in syncIdentFromReceiver() }
     }
 
-    /// The CDI uses every point of vertical space that its card permits, capped
-    /// by the width remaining after the tuned-station details.
-    private func dialDiameter(in cardSize: CGSize) -> CGFloat {
-        let usableHeight = max(0, cardSize.height - cardPadding * 2)
-        let usableWidth = max(0, cardSize.width - cardPadding * 2)
-        let widthForDial = max(0, usableWidth - radioDetailsWidth - contentSpacing)
-        return min(usableHeight, widthForDial)
+    /// The indicator fills the width, bounded by the height left over above
+    /// the fixed-height Radio Panel row.
+    private func dialDiameter(in size: CGSize) -> CGFloat {
+        let usableHeight = max(0, size.height - lowerRowHeight - contentSpacing)
+        return min(size.width, usableHeight)
     }
 
-    /// The OBS course rounded to whole degrees for display (360 instead of 0).
-    private var displayCourse: Int {
-        let rounded = Int(obs.rounded()) % 360
-        return rounded == 0 ? 360 : rounded
-    }
-
-    /// A proxy that normalizes typed identifiers: uppercased and capped at the
-    /// three characters a VOR ident uses.
-    private var identText: Binding<String> {
+    private var obsBinding: Binding<Double> {
         Binding(
-            get: { ident },
-            set: { ident = String($0.uppercased().prefix(3)) }
+            get: { Double(receiver.obs) },
+            set: { newValue in
+                let wrapped = Int(newValue.rounded()) % 360
+                receiver.obs = wrapped < 0 ? wrapped + 360 : wrapped
+            }
         )
     }
 
+    /// Normalizes typed input and, the moment it resolves to a known
+    /// station, tunes the receiver's frequency to match.
+    private var identTextBinding: Binding<String> {
+        Binding(
+            get: { identText },
+            set: { newValue in
+                identText = String(newValue.uppercased().prefix(3))
+                if let station = matchedStation {
+                    receiver.tune(toFrequencyHundredths: Int((station.frequency * 100).rounded()))
+                }
+            }
+        )
+    }
+
+    /// Keeps the ident field mirroring the receiver's actual tuned station
+    /// whenever the frequency changes some other way (e.g. a NAV1 ↔ NAV2 swap).
+    private func syncIdentFromReceiver() {
+        identText = VORNavigation.station(withFrequencyHundredths: receiver.frequencyHundredths, in: stations)?.ident ?? ""
+    }
 }
 
 /// The "find your position" challenge status and controls, shown in the map
@@ -555,15 +575,6 @@ struct OBSInstrument: View {
                 .foregroundStyle(.yellow)
                 .font(.system(size: 14 * scale))
                 .offset(y: -radius + 10 * scale)
-
-            // OBS knob (decorative — the whole dial is draggable).
-            /*Text("OBS")
-                .font(.system(size: 9 * scale, weight: .bold))
-                .foregroundStyle(.white)
-                .frame(width: 30 * scale, height: 30 * scale)
-                .background(Color.gray.opacity(0.4), in: Circle())
-                .overlay(Circle().stroke(.white.opacity(0.5), lineWidth: scale))
-                .offset(x: -radius + 4 * scale, y: radius - 4 * scale)*/
         }
         .frame(width: diameter, height: diameter)
         .contentShape(Circle())

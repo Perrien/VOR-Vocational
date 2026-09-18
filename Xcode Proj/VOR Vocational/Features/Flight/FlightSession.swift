@@ -27,6 +27,13 @@ struct NAVReceiver: Equatable {
     mutating func adjustOBS(by amount: Int) {
         obs = (obs + amount % 360 + 360) % 360
     }
+
+    /// Sets the channel directly from a known station's frequency (e.g. a
+    /// resolved ident lookup), bypassing the whole/fine knob adjustments.
+    mutating func tune(toFrequencyHundredths frequencyHundredths: Int) {
+        wholeMHz = frequencyHundredths / 100
+        fineStep = (frequencyHundredths % 100) / 5
+    }
 }
 
 /// Per-flight state shared by the reusable flight surface and its cockpit.

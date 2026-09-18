@@ -139,6 +139,37 @@ final class NavigationCoreTests: XCTestCase {
         assertReading(outOfRange.cdiReading, flag: .off, deflection: 0)
     }
 
+    func testKnobTunedReceiverReceptionRespectsRange() {
+        let station = makeStation(identifier: "CTR")
+        var receiver = NAVReceiver()
+        receiver.adjustWhole(by: 8)
+        receiver.adjustFine(by: 16)
+        XCTAssertEqual(receiver.frequencyHundredths, 11680)
+
+        let inRange = VORNavigation.receiverReading(
+            frequencyHundredths: receiver.frequencyHundredths,
+            obs: receiver.obs,
+            normalizedAircraftPosition: CGPoint(x: 0.5, y: 0.6),
+            stations: [station],
+            mapWidthNM: 500,
+            mapHeightNM: 500,
+            cdiMax: 10
+        )
+        let outOfRange = VORNavigation.receiverReading(
+            frequencyHundredths: receiver.frequencyHundredths,
+            obs: receiver.obs,
+            normalizedAircraftPosition: .zero,
+            stations: [station],
+            mapWidthNM: 500,
+            mapHeightNM: 500,
+            cdiMax: 10
+        )
+
+        XCTAssertEqual(inRange.station?.identifier, "CTR")
+        XCTAssertNil(outOfRange.station)
+        assertReading(outOfRange.cdiReading, flag: .off, deflection: 0)
+    }
+
     func testFreshFlightSessionDefaults() {
         let position = CGPoint(x: 0.5067, y: 0.6889)
         let session = FlightSession(normalizedAirportPosition: position)

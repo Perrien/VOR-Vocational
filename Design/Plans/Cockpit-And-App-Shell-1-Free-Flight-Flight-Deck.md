@@ -31,13 +31,13 @@ The test target already tests pure navigation and flight movement in `Xcode Proj
 
 | # | Decision |
 |---|---|
-| S6 | Free Flight retains all current flight and chart functionality in a reorganized interface, with physical frequency-tuned NAV radios, because V0.2 is a functional cleanup rather than a mock-up. |
+| S6 | Free Flight retains all current flight and chart functionality in a reorganized interface, with frequency-tuned NAV radios, because V0.2 is a functional cleanup rather than a mock-up. *(Amended 2026-09-18 — tuning input reverted to a typed ident field rather than physical knobs; see the T4 note.)* |
 | I1 | Free Flight is the reusable baseline flight surface; future Missions layer route planning and other mission-only behavior around it, because common cockpit behavior must not become conditional by Mode. |
 | I2 | A new Free Flight entry creates a fresh, non-resumable session, because resume rules belong to a future Mission design. |
 | I3 | Extract the reusable flight surface from the current `MapView` and give Free Flight a thin direct-launch wrapper, because future Mission panels must not be switches inside one all-purpose screen. |
 | I4 | NAV receivers tune 108.00–117.95 MHz in 0.05 MHz channels; the selected frequency always displays, while received ident and CDI data appear only in range. |
-| I5 | Use separate physical-looking whole-MHz and fine 0.05-MHz knobs, because they provide a realistic coarse/fine interaction without nested hit targets. |
-| I6 | Whole-MHz tuning stops at 108 and 117; fine tuning wraps .00–.95 without carrying, because the two knobs stay independent. |
+| I5 | ~~Use separate physical-looking whole-MHz and fine 0.05-MHz knobs, because they provide a realistic coarse/fine interaction without nested hit targets.~~ **Superseded 2026-09-18:** the knob interaction proved fiddly in practice; NAV radios tune by typing a station's ident instead. See the T4 note. |
+| I6 | ~~Whole-MHz tuning stops at 108 and 117; fine tuning wraps .00–.95 without carrying, because the two knobs stay independent.~~ **Superseded 2026-09-18:** no longer user-facing (no knobs); the underlying `adjustWhole`/`adjustFine` clamp/wrap rules still hold in `NAVReceiver` and remain tested. |
 | I7 | Each flight wrapper creates one per-flight session object, and the reusable surface operates on it, because Mode boundaries own their own flight state. |
 | I8 | A dedicated NAV1 ↔ NAV2 control exchanges active frequencies and OBS settings only, because it supports receiver handoff without altering aircraft state. |
 | U8 | Put the chart above a bottom-docked cockpit with equal heading, NAV1, and NAV2 bays; enforce a 1100 × 760 point minimum window and clamp their shared visual scale to 0.80×...1.00× instead of a compact reflow. |
@@ -46,9 +46,9 @@ The test target already tests pure navigation and flight movement in `Xcode Proj
 | U11 | Each bay is a vertical stack with a primary dial above a horizontal lower control row, because the cockpit needs a repeatable visual hierarchy. |
 | U12 | The Heading Indicator is the complete black compass display; its lower-row Heading Knob replaces the paired hold-turn buttons and turns left to decrease/right to increase heading. |
 | U13 | Put Play/Pause with airspeed, playback, and the Heading Knob in the heading bay's lower row. |
-| U14 | Each NAV bay places the CDI-style VOR Indicator above a lower Radio Panel, with its OBS Dial at the indicator's lower-left. |
+| U14 | ~~Each NAV bay places the CDI-style VOR Indicator above a lower Radio Panel, with its OBS Dial at the indicator's lower-left.~~ **Superseded 2026-09-18:** OBS is set by dragging the VOR Indicator directly; there is no separate OBS Dial. See the T4 note. |
 | U15 | Standardize both NAV bays on the CDI-style VOR Indicator; do not expose the current HSI alternative in V0.2. |
-| U16 | Each Radio Panel contains selected frequency, received ident, and paired tuning knobs; the OBS Dial remains attached to its VOR Indicator. |
+| U16 | ~~Each Radio Panel contains selected frequency, received ident, and paired tuning knobs; the OBS Dial remains attached to its VOR Indicator.~~ **Superseded 2026-09-18:** the Radio Panel is the receiver label, an editable ident field, and the tuned frequency only — no tuning knobs, no separate OBS Dial. See the T4 note. |
 | U17 | Fresh Free Flight starts both receivers at 108.00 MHz with no received identifier, because tuning is a deliberate first action. |
 | U18 | Fresh Free Flight starts paused at Midland Cityport, heading 000°, and 260 knots. |
 | U19 | Fresh Free Flight starts both OBS Dials at 000°. |
@@ -119,8 +119,8 @@ Add pure tests for whole-MHz clamping at 108/117, fine-step wrapping `.00 ↔ .9
 |---|---|---|---|---|---|
 | T1 | Add pure receiver, session, and frequency lookup rules with tests | completed | checkpoint | — | |
 | T2 | Extract the direct-launch reusable Free Flight surface | completed | **owner stop** | commit | |
-| T3 | Build the three-bay physical cockpit and heading controls | awaiting owner | **owner stop** | commit | |
-| T4 | Add frequency radios, OBS Dials, and NAV swap | not started | **owner stop** | commit | |
+| T3 | Build the three-bay physical cockpit and heading controls | completed | **owner stop** | commit | |
+| T4 | Add frequency radios, OBS Dials, and NAV swap | awaiting owner | **owner stop** | commit | |
 | T5 | Replace the map panel with Chart and Debug diagnostics | not started | **owner stop** | commit + push | |
 | T6 | Close out Part 1 | not started | continue | — | |
 
@@ -188,25 +188,28 @@ cockpit-flight-deck T3: build the three-bay flight cockpit
 
 - **Files:** `Xcode Proj/VOR Vocational/Features/Flight/PlaneControls.swift` (edit), `Xcode Proj/VOR Vocational/Features/Map/MapView.swift` (edit), `Xcode Proj/VOR Vocational/Features/Flight/FlightSession.swift` (edit), `Xcode Proj/VOR Vocational/Domain/Navigation/VORNavigation.swift` (edit only if a pure helper needs correction), `Xcode Proj/VORVocationalTests/NavigationCoreTests.swift` (edit).
 - **Done when:**
-  - Each Radio Panel displays its receiver label, selected two-decimal frequency, received ident or `---`, paired whole/fine knobs, and a separate OBS Dial attached to its VOR Indicator.
-  - NAV1 and NAV2 begin at `108.00`, `---`, and OBS `000°`; matching an in-range station displays its ident and live CDI/TO-FROM, while an unmatched or out-of-range channel displays the red NAV flag and `---` without changing the selected frequency.
-  - Whole knobs clamp at 108/117; fine knobs wrap `.00...95` in 0.05 MHz steps without changing the whole MHz. Clockwise and counter-clockwise circular drags obey those rules.
+  - ~~Each Radio Panel displays its receiver label, selected two-decimal frequency, received ident or `---`, paired whole/fine knobs, and a separate OBS Dial attached to its VOR Indicator.~~ **Amended 2026-09-18:** each Radio Panel displays its receiver label, an editable ident field, and the tuned frequency only — no tuning knobs, no separate OBS Dial. See the note below.
+  - NAV1 and NAV2 begin at `108.00` with no ident entered and OBS `000°`. Typing a station's ident into the Radio Panel tunes that receiver's frequency to match and turns the frequency green; an unmatched or partial ident leaves the frequency unchanged and in its normal color. Reception (live CDI/TO-FROM vs. the red NAV flag) still depends on range, unchanged from T1.
+  - ~~Whole knobs clamp at 108/117; fine knobs wrap `.00...95` in 0.05 MHz steps without changing the whole MHz. Clockwise and counter-clockwise circular drags obey those rules.~~ **Amended 2026-09-18:** no longer user-facing; `NAVReceiver.adjustWhole`/`adjustFine` still hold these rules and remain tested, but nothing in the UI calls them.
   - The NAV1 ↔ NAV2 control swaps complete receiver values (frequency and OBS) and leaves normalized aircraft position, heading, speed, play state, multiplier, camera, layers, selection, and CDI scale unchanged.
+  - OBS is set by dragging the VOR Indicator directly, exactly as it worked before this part.
   - Tests from T1 remain green and add an in-range/out-of-range reception assertion using a supplied station and position.
   - Run the project gates required by the protocol.
-- **Do not:** reintroduce typed station identifiers, add standby frequencies, DME behavior, HSI, or alter VOR station data and service-volume ranges.
+- **Do not:** ~~reintroduce typed station identifiers~~ (**superseded 2026-09-18** — see the note below), add standby frequencies, DME behavior, HSI, or alter VOR station data and service-volume ranges.
+- **Material alteration:** at this task's stop point the owner found the physical-knob tuning "too fiddly and annoying" and asked to revert to typing a station ident, with the OBS Dial dropped in favor of dragging the VOR Indicator directly (its original T1–T3 behavior). Confirmed with the owner that this keeps `FlightSession`/`NAVReceiver` storing frequency as the source of truth (S6/I4 stand); only the tuning *input* reverts to an ident field, which resolves via the pre-existing `VORNavigation.station(withIdent:)` and writes the match's frequency into the receiver via a new `NAVReceiver.tune(toFrequencyHundredths:)`. `FrequencyKnob` and the OBS-Dial use of `RotaryKnob` were deleted; `RotaryKnob` itself remains, still used by the heading bay's Heading Knob. I5, I6, U14, and U16 are amended/superseded above to match.
 - **Verification handle** — permanent:
   - **Where:** at the Midland Cityport starting position, operate the NAV1 Radio Panel.
-  - **Positive:** tune NAV1 to `116.80` → its received ident becomes `CTR` and its VOR Indicator leaves the NAV flag; set an OBS, then press NAV1 ↔ NAV2 → NAV2 now shows `116.80` and that OBS.
-  - **Negative:** rotate NAV1's fine knob from `.95` one step clockwise → it reads `.00` with the same whole-MHz value; tuning NAV1 or pressing swap must not change heading, airspeed, or aircraft position.
-  - **Reads:** `FlightSession.nav1`, `nav2`, and `swapNAVReceivers()` in `Xcode Proj/VOR Vocational/Features/Flight/FlightSession.swift`, with `VORNavigation.receiverReading` supplying the displayed station and CDI.
+  - **Positive:** type `CTR` into NAV1's ident field → the frequency reads `116.80` in green; drag NAV1's VOR Indicator to set an OBS, then press NAV1 ↔ NAV2 → NAV2 now shows `116.80`/`CTR` and that OBS.
+  - **Negative:** type an ident that matches no station → the frequency stays at its previous value and is not green; typing an ident or pressing swap must not change heading, airspeed, or aircraft position.
+  - **Reads:** `FlightSession.nav1`, `nav2`, and `swapNAVReceivers()` in `Xcode Proj/VOR Vocational/Features/Flight/FlightSession.swift`, with `VORNavigation.receiverReading` supplying the CDI and `VORNavigation.station(withIdent:)`/`station(withFrequencyHundredths:)` resolving the typed ident.
 - **Commit point:**
 
 ```text
-cockpit-flight-deck T4: add physical NAV radio tuning
+cockpit-flight-deck T4: add NAV radio ident tuning
 
-- tune full-band NAV frequencies with paired controls
-- separate OBS control from reception and support receiver handoff
+- tune NAV frequencies by typing a station ident
+- set OBS by dragging the VOR Indicator directly
+- support receiver handoff via NAV1 ↔ NAV2 swap
 ```
 
 **T5 — Replace the map panel with Chart and Debug diagnostics**
