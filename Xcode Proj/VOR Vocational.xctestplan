@@ -1,0 +1,31 @@
+{
+  "configurations" : [
+    {
+      "id" : "44F239B1-605A-41D4-885A-6A96DEF7B941",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "codeCoverage" : false,
+    "performanceAntipatternCheckerEnabled" : true,
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:VOR Vocational.xcodeproj",
+      "identifier" : "4529A2953050988E00A19798",
+      "name" : "VOR Vocational"
+    },
+    "testInteropMode" : "complete"
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:VOR Vocational.xcodeproj",
+        "identifier" : "8868DF33305D74330047488B",
+        "name" : "VORVocationalTests"
+      }
+    }
+  ],
+  "version" : 1
+}
