@@ -148,7 +148,7 @@ one.
 |---|---|---|---|---|---|
 | T1 | Build the Home screen and Mode-routing shell | completed | **owner stop** | commit | |
 | T2 | Build the Learn and Missions unavailable-entry lists | awaiting owner | **owner stop** | commit | |
-| T3 | Build the Practice list and reintroduce Position Challenge | not started | **owner stop** | commit | |
+| T3 | Build the Practice list and reintroduce Position Challenge | awaiting owner | **owner stop** | commit | see note |
 | T4 | Close out Part 2 | not started | continue | — | |
 
 **T1 — Build the Home screen and Mode-routing shell**
@@ -265,6 +265,51 @@ cockpit-flight-deck T3: bring back Position Challenge under Practice
 - relocate the existing Position Challenge panel into its own Practice screen
 ```
 
+- **Material alteration:** the owner's verification found NAV reception reads the guess marker, not
+  the hidden target — `MapView.receiverReading` was hardwired to `session.normalizedAircraftPosition`,
+  the same property the plane-drag (guess) writes to, so the CDI needles tracked wherever the guess
+  was dragged. Since OBS can always be dialed to center the needle from any position, this made "tune
+  VORs, dial OBS until centered" convey no information about the real target — the exercise as
+  originally built was not just visually wrong but unsolvable. This plan's Prefactoring section
+  anticipated only one `MapView` extension point (the chart overlay); it did not anticipate that
+  reception itself would also need to be decoupled from the draggable guess. With the owner's
+  approval, `MapView` gained a second additive, defaults-to-nil init parameter,
+  `receptionPosition: CGPoint?`, that `receiverReading` now prefers over
+  `session.normalizedAircraftPosition` when supplied — the same shape as the chart-overlay parameter,
+  so Free Flight passes nothing and is unaffected. `PositionChallengeView` now tracks the current
+  target separately from `PositionChallenge.State` (which only carries it in scored, unscaled-map-space
+  form once revealed) and supplies it as `receptionPosition`, so the radios read as if standing at the
+  hidden target throughout the challenge.
+
+  Separately, exercising the radios for Position Challenge surfaced a pre-existing bug in
+  `OBSInstrument`'s drag handling in `PlaneControls.swift` (already an edited file for this task): it
+  recomputed `obs + delta` fresh from the current whole-degree-rounded `obs` on every drag event, so a
+  slow drag's sub-degree deltas kept getting rounded away instead of accumulating — read as the dial
+  pausing, then jumping several degrees at once. Fixed by giving it the same carried-forward
+  fractional-delta accumulator `RotaryKnob.accumulate(_:)` already uses; applied the identical fix to
+  `HSIInstrument`'s drag handling for the same latent bug, though that view is still unwired.
+
+  The owner also found `PositionChallengePanel` scaling and panning with the map and blocking a VOR.
+  It had been placed inside the `MapView` chart-overlay closure, which sits in the same
+  zoom/pan-scaled group as the map artwork (deliberately, so the target reveal tracks the chart) — so
+  the panel was tracking zoom/pan too, and zooming in could push it off screen entirely. Moved the
+  panel out to `PositionChallengeView`'s own top-level overlay, alongside the Home control, so it
+  stays fixed on screen like Chart/Home regardless of zoom; the chart overlay itself now carries only
+  the target/result reveal. Also made the panel draggable (a plain `DragGesture` on its background,
+  default threshold, so taps still reach its buttons) so the owner can move it off any VOR it starts
+  over.
+
+  The owner also flagged that typing an out-of-range station's ident still auto-filled its frequency,
+  even though the CDI correctly showed `NAV` (no reception). This was `NavRadioView`'s original,
+  documented Part 1 behavior ("used to resolve a typed ident regardless of current reception range —
+  separate from `reading`, which is range-gated") — not a regression from this task, but the owner
+  wants it reversed, since seeing a frequency populate is itself a tell that a station exists there.
+  `NavRadioView` now takes the same reception position (and map dimensions) `MapView` already computes
+  for `receiverReading`, and only resolves a typed ident's station — for both the frequency auto-fill
+  and the field's valid/highlighted styling — once it's actually in range from there. In Position
+  Challenge this correctly uses the hidden target, not the freely-dragged guess, matching the same
+  `receptionPosition` override already threaded through for reception.
+
 **T4 — Close out Part 2**
 
 - **Files:** `Design/Plans/Cockpit-And-App-Shell-2-Mode-Navigation.md` (edit only for task statuses
@@ -298,3 +343,7 @@ cockpit-flight-deck T3: bring back Position Challenge under Practice
 
 Empty at authoring. The executor appends adjacent problems found during this part and files each
 immediately as a `Bug-`, `Feature-`, `Decision-`, or `Chore-` ticket with `Status: untriaged`.
+
+- `Bug-Position-Challenge-Play-Not-Disabled` — `PlaneControlView`'s existing `isChallengeActive`
+  parameter can't reach it from `PositionChallengeView` without adding challenge-conditional state
+  to `MapView`, which Task 3 rules out; Play can still disturb an active challenge's guess.

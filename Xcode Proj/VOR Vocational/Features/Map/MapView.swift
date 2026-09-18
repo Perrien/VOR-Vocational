@@ -2,11 +2,28 @@ import SwiftUI
 import AppKit
 
 /// A flat map with VOR stations and a draggable plane, plus NAV radios below it.
-struct MapView: View {
+struct MapView<ChartOverlay: View>: View {
     @Bindable var session: FlightSession
 
-    init(session: FlightSession) {
+    /// Chart-space content positioned by a caller outside this view (e.g.
+    /// Position Challenge's hidden-target reveal), given the same fitted
+    /// `imageRect` this view already threads through `FlatMap.point(for:in:)`.
+    /// Defaults to none, so Free Flight's rendering is unaffected.
+    private let chartOverlay: (CGRect) -> ChartOverlay
+
+    /// Overrides what the NAV radios receive from, independent of the plane
+    /// icon's own (draggable) position. Defaults to nil, so reception keeps
+    /// reading `session.normalizedAircraftPosition` exactly as Free Flight
+    /// always has. Position Challenge supplies the hidden target here, since
+    /// its plane icon instead doubles as the player's freely-dragged guess.
+    private let receptionPosition: CGPoint?
+
+    init(session: FlightSession,
+         receptionPosition: CGPoint? = nil,
+         @ViewBuilder chartOverlay: @escaping (CGRect) -> ChartOverlay = { _ in EmptyView() }) {
         _session = Bindable(session)
+        self.receptionPosition = receptionPosition
+        self.chartOverlay = chartOverlay
     }
 
     // The fixed VOR beacons on the land of Myosia.
@@ -68,14 +85,20 @@ struct MapView: View {
                         name: "NAV1",
                         receiver: $session.nav1,
                         stations: stations,
-                        reading: nav1Reading.cdiReading
+                        reading: nav1Reading.cdiReading,
+                        normalizedAircraftPosition: receptionPosition ?? session.normalizedAircraftPosition,
+                        mapWidthNM: FlatMap.widthNM,
+                        mapHeightNM: FlatMap.heightNM
                     )
                 } nav2: {
                     NavRadioView(
                         name: "NAV2",
                         receiver: $session.nav2,
                         stations: stations,
-                        reading: nav2Reading.cdiReading
+                        reading: nav2Reading.cdiReading,
+                        normalizedAircraftPosition: receptionPosition ?? session.normalizedAircraftPosition,
+                        mapWidthNM: FlatMap.widthNM,
+                        mapHeightNM: FlatMap.heightNM
                     )
                 }
             }
@@ -91,16 +114,20 @@ struct MapView: View {
         .ignoresSafeArea()
     }
 
-    /// The zoomable, pannable map. Only the artwork scales with the camera; the
-    /// markers and plane keep a constant screen size and are positioned by applying
-    /// the same zoom/pan transform to their map coordinates (`screenPoint`).
+    /// The zoomable, pannable map. Only the artwork (and the caller's chart
+    /// overlay, drawn in the same image-relative coordinates) scales with the
+    /// camera; the markers and plane keep a constant screen size and are
+    /// positioned by applying the same zoom/pan transform to their map
+    /// coordinates (`screenPoint`).
     private func mapArea(mapSize: CGSize, imageRect: CGRect, planePos: CGPoint) -> some View {
         ZStack {
-            // Map artwork: this is the only layer that scales with zoom.
-            FlatMap(imageRect: imageRect)
-                .frame(width: mapSize.width, height: mapSize.height)
-                .scaleEffect(session.zoom)
-                .offset(session.pan)
+            ZStack {
+                FlatMap(imageRect: imageRect)
+                    .frame(width: mapSize.width, height: mapSize.height)
+                chartOverlay(imageRect)
+            }
+            .scaleEffect(session.zoom)
+            .offset(session.pan)
 
             if session.showGrid {
                 HexGridOverlay(hexHeightNM: session.gridSizeNM,
@@ -292,7 +319,7 @@ struct MapView: View {
         VORNavigation.receiverReading(
             frequencyHundredths: receiver.frequencyHundredths,
             obs: receiver.obs,
-            normalizedAircraftPosition: session.normalizedAircraftPosition,
+            normalizedAircraftPosition: receptionPosition ?? session.normalizedAircraftPosition,
             stations: stations,
             mapWidthNM: FlatMap.widthNM,
             mapHeightNM: FlatMap.heightNM,

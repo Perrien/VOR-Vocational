@@ -29,8 +29,7 @@ struct ContentView: View {
         case .missions:
             MissionsListView(onHome: { destination = .home })
         case .practice:
-            // The Practice screen lands in Part 2's next task.
-            EmptyView()
+            PracticeListView(onHome: { destination = .home })
         }
     }
 }

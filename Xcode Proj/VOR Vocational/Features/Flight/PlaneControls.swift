@@ -293,21 +293,35 @@ struct RotaryKnob: View {
 /// the tuned frequency.
 ///
 /// Typing a station's ident (e.g. "CTR") tunes the receiver to that station's
-/// frequency and turns the frequency green; an unmatched or partial ident
-/// leaves the current frequency untouched and displayed in its normal color.
+/// frequency and turns the frequency green, but only once that station is in
+/// range; an unmatched, partial, or out-of-range ident leaves the current
+/// frequency untouched and displayed in its normal color.
 struct NavRadioView: View {
     let name: String
     @Binding var receiver: NAVReceiver
-    /// All bundled stations, used to resolve a typed ident regardless of
-    /// current reception range — separate from `reading`, which is range-gated.
+    /// All bundled stations, used to resolve a typed ident.
     let stations: [VORStation]
     /// The CDI reading for the receiver's current frequency and OBS.
     let reading: CDIReading
+    /// Where reception range is measured from — the plane in Free Flight, or
+    /// Position Challenge's hidden target — so a typed ident only resolves
+    /// once its station is actually receivable from here. Real avionics only
+    /// let you confirm an ident's Morse code in range; auto-filling a
+    /// frequency for an out-of-range station would leak the same information
+    /// for free.
+    let normalizedAircraftPosition: CGPoint
+    let mapWidthNM: Double
+    let mapHeightNM: Double
 
     @State private var identText: String = ""
 
     private var matchedStation: VORStation? {
-        VORNavigation.station(withIdent: identText, in: stations)
+        guard let station = VORNavigation.station(withIdent: identText, in: stations) else { return nil }
+        let distance = VORNavigation.distanceNM(fromNormalized: normalizedAircraftPosition,
+                                                 toNormalized: station.relativePosition,
+                                                 mapWidthNM: mapWidthNM,
+                                                 mapHeightNM: mapHeightNM)
+        return distance <= station.rangeNM ? station : nil
     }
     private var isValid: Bool { matchedStation != nil }
 
@@ -401,49 +415,6 @@ struct NavRadioView: View {
     }
 }
 
-/// The "find your position" challenge status and controls, shown in the map
-/// sidebar: start a challenge, check a placed guess, or start a new one.
-struct PositionChallengePanel: View {
-    let state: PositionChallenge.State
-    let onStart: () -> Void
-    let onCheck: () -> Void
-    let onReset: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Position Challenge")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ControlPalette.primaryText)
-
-            switch state {
-            case .inactive:
-                Text("Tune in-range VORs, dial OBS until the needles center, then drag the plane to your fix.")
-                    .font(.caption2)
-                    .foregroundStyle(ControlPalette.secondaryText)
-                Button("Start Challenge", action: onStart)
-                    .buttonStyle(.borderedProminent)
-                    .tint(ControlPalette.accent)
-
-            case .active:
-                Text("Drag the plane to where you think you are.")
-                    .font(.caption2)
-                    .foregroundStyle(ControlPalette.secondaryText)
-                Button("Check Placement", action: onCheck)
-                    .buttonStyle(.borderedProminent)
-                    .tint(ControlPalette.accent)
-
-            case .revealed(let result):
-                Text(String(format: "Off by %.1f NM", result.errorNM))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ControlPalette.accent)
-                Button("New Challenge", action: onReset)
-                    .buttonStyle(.borderedProminent)
-                    .tint(ControlPalette.accent)
-            }
-        }
-    }
-}
-
 /// Edits the angular deviation represented by full-scale CDI deflection, as
 /// one Form row: a numeric field whose own title is the row's label,
 /// matching the other rows in Flight Diagnostics. Clamped to (1, 89) so the
@@ -472,6 +443,7 @@ struct OBSInstrument: View {
 
     // Tracks the previous drag angle so we can turn the dial like a knob.
     @State private var lastDragAngle: Double?
+    @State private var accumulatedDelta: Double = 0
 
     private var radius: CGFloat { diameter / 2 }
     private var scale: CGFloat { diameter / 150 }
@@ -611,13 +583,30 @@ struct OBSInstrument: View {
                     var delta = angle - last
                     if delta > 180 { delta -= 360 }
                     if delta < -180 { delta += 360 }
-                    var next = (obs + delta).truncatingRemainder(dividingBy: 360)
-                    if next < 0 { next += 360 }
-                    obs = next
+                    accumulate(delta)
                 }
                 lastDragAngle = angle
             }
-            .onEnded { _ in lastDragAngle = nil }
+            .onEnded { _ in
+                lastDragAngle = nil
+                accumulatedDelta = 0
+            }
+    }
+
+    /// Carries a fractional angular delta between drag events, applying whole
+    /// degrees as they cross and keeping any leftover fraction for the next
+    /// event — otherwise a slow drag's sub-degree deltas keep getting rounded
+    /// away by `obs`'s whole-degree storage instead of accumulating, which
+    /// reads as the dial pausing and then jumping. Mirrors `RotaryKnob.accumulate(_:)`.
+    private func accumulate(_ delta: Double) {
+        accumulatedDelta += delta
+        let wholeDegrees = accumulatedDelta.rounded(.towardZero)
+        if wholeDegrees != 0 {
+            var next = (obs + wholeDegrees).truncatingRemainder(dividingBy: 360)
+            if next < 0 { next += 360 }
+            obs = next
+            accumulatedDelta -= wholeDegrees
+        }
     }
 }
 
@@ -636,6 +625,7 @@ struct HSIInstrument: View {
     var diameter: CGFloat = 178
 
     @State private var lastDragAngle: Double?
+    @State private var accumulatedDelta: Double = 0
 
     private var radius: CGFloat { diameter / 2 }
     private var scale: CGFloat { diameter / 150 }
@@ -753,13 +743,28 @@ struct HSIInstrument: View {
                     var delta = angle - last
                     if delta > 180 { delta -= 360 }
                     if delta < -180 { delta += 360 }
-                    var next = (obs + delta).truncatingRemainder(dividingBy: 360)
-                    if next < 0 { next += 360 }
-                    obs = next
+                    accumulate(delta)
                 }
                 lastDragAngle = angle
             }
-            .onEnded { _ in lastDragAngle = nil }
+            .onEnded { _ in
+                lastDragAngle = nil
+                accumulatedDelta = 0
+            }
+    }
+
+    /// Carries a fractional angular delta between drag events, matching
+    /// `OBSInstrument.accumulate(_:)`, so a slow drag isn't dropped by `obs`'s
+    /// whole-degree storage.
+    private func accumulate(_ delta: Double) {
+        accumulatedDelta += delta
+        let wholeDegrees = accumulatedDelta.rounded(.towardZero)
+        if wholeDegrees != 0 {
+            var next = (obs + wholeDegrees).truncatingRemainder(dividingBy: 360)
+            if next < 0 { next += 360 }
+            obs = next
+            accumulatedDelta -= wholeDegrees
+        }
     }
 }
 

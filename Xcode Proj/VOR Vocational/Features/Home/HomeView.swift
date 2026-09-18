@@ -20,12 +20,12 @@ struct HomeView: View {
                 ModeCard(title: "Practice",
                          description: "Drill a single navigation skill until it clicks.",
                          systemImage: "scope") { onSelect(.practice) }
-                ModeCard(title: "Free Flight",
-                         description: "Fly Myosia with the full cockpit and no set objective.",
-                         systemImage: "airplane") { onSelect(.freeFlight) }
                 ModeCard(title: "Missions",
                          description: "Fly scripted, scored flights against a briefing.",
                          systemImage: "flag.checkered") { onSelect(.missions) }
+                ModeCard(title: "Free Flight",
+                         description: "Fly Myosia with the full cockpit and no set objective.",
+                         systemImage: "airplane") { onSelect(.freeFlight) }
             }
             .padding(48)
             .frame(maxWidth: 820)
