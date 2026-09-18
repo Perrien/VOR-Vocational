@@ -120,8 +120,8 @@ Add pure tests for whole-MHz clamping at 108/117, fine-step wrapping `.00 ↔ .9
 | T1 | Add pure receiver, session, and frequency lookup rules with tests | completed | checkpoint | — | |
 | T2 | Extract the direct-launch reusable Free Flight surface | completed | **owner stop** | commit | |
 | T3 | Build the three-bay physical cockpit and heading controls | completed | **owner stop** | commit | |
-| T4 | Add frequency radios, OBS Dials, and NAV swap | awaiting owner | **owner stop** | commit | |
-| T5 | Replace the map panel with Chart and Debug diagnostics | not started | **owner stop** | commit + push | |
+| T4 | Add frequency radios, OBS Dials, and NAV swap | completed | **owner stop** | commit | |
+| T5 | Replace the map panel with Chart and Debug diagnostics | awaiting owner | **owner stop** | commit + push | |
 | T6 | Close out Part 1 | not started | continue | — | |
 
 **T1 — Add pure receiver, session, and frequency lookup rules with tests**
@@ -225,8 +225,8 @@ cockpit-flight-deck T4: add NAV radio ident tuning
 - **Do not:** add custom Preferences, a Home control, Mode catalogs, a user-visible debug entry, wind controls, or a second persistent flight session.
 - **Verification handle** — permanent:
   - **Where:** run a Debug build, launch direct Free Flight, choose **Debug → Flight Diagnostics**, and open the Chart button over the map.
-  - **Positive:** use Chart to hide Airports → airport symbols disappear while the chart remains interactive; press Play and turn heading → the diagnostics position and heading-derived receiver readings update live; tune NAV1 to `116.80` → Diagnostics reports `CTR`; edit CDI scale → the CDI response changes from that same session value.
-  - **Negative:** tune an unmatched channel such as `108.00` → Diagnostics reports no reception and the VOR Indicator shows NAV; toggling a Chart layer must not change the diagnostics position or receiver frequency.
+  - **Positive:** use Chart to hide Airports → airport symbols disappear while the chart remains interactive; press Play and turn heading → the diagnostics position and heading-derived receiver readings update live; type `CTR` into NAV1's ident field (per the T4 amendment) → Diagnostics reports `CTR`; edit CDI scale → the CDI response changes from that same session value.
+  - **Negative:** leave NAV1 at its default `108.00` with no ident entered → Diagnostics reports no reception and the VOR Indicator shows NAV; toggling a Chart layer must not change the diagnostics position or receiver frequency.
   - **Reads:** `FlightSession` in `Xcode Proj/VOR Vocational/Features/Flight/FlightSession.swift` through `FlightDiagnosticsStore` and shared `VORNavigation.receiverReading`, the source used by the visible VOR Indicators.
 - **Commit point:**
 

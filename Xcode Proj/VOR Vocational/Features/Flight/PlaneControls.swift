@@ -1,14 +1,9 @@
 import SwiftUI
 
 enum ControlPalette {
-    static let panelBackground = Color(red: 0.88, green: 0.89, blue: 0.91)
-    static let cardBackground = Color(red: 0.95, green: 0.96, blue: 0.97)
-    static let fieldBackground = Color.white.opacity(0.82)
     static let primaryText = Color(red: 0.12, green: 0.14, blue: 0.16)
     static let secondaryText = Color(red: 0.32, green: 0.35, blue: 0.38)
     static let accent = Color(red: 0.00, green: 0.36, blue: 0.25)
-    static let divider = Color.black.opacity(0.16)
-    static let fieldBorder = Color.black.opacity(0.22)
 
     // The cockpit reads as one continuous dark instrument panel rather than
     // light dashboard cards, so its bays use their own dark-ground palette.
@@ -449,82 +444,20 @@ struct PositionChallengePanel: View {
     }
 }
 
-/// Edits the angular deviation represented by full-scale CDI deflection.
+/// Edits the angular deviation represented by full-scale CDI deflection, as
+/// one Form row: a numeric field whose own title is the row's label,
+/// matching the other rows in Flight Diagnostics. Clamped to (1, 89) so the
+/// stored value can never hit the divide-by-zero at 0 or the undefined
+/// TO/FROM split at or beyond 90.
 struct CDIMaxField: View {
     @Binding var value: Double
-    @State private var text: String = ""
-
-    private var isValid: Bool {
-        guard let number = Double(text) else { return false }
-        return number > 0 && number < 90
-    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("CDI max")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ControlPalette.primaryText)
-
-            HStack(spacing: 8) {
-                TextField("10", text: $text)
-                    .textFieldStyle(.plain)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(ControlPalette.primaryText)
-                    .frame(width: 42)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 3)
-                    .background(ControlPalette.fieldBackground, in: RoundedRectangle(cornerRadius: 5))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 5)
-                            .stroke(isValid ? ControlPalette.fieldBorder : Color.red.opacity(0.8), lineWidth: 1)
-                        )
-
-                Text("degrees")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(ControlPalette.primaryText)
+        TextField("CDI max", value: $value, format: .number)
+            .frame(width: 100)
+            .onChange(of: value) { _, newValue in
+                value = min(max(newValue, 1), 89)
             }
-
-            Text("Enter a value greater than 0 and less than 90")
-                .font(.caption2)
-                .foregroundStyle(isValid ? ControlPalette.secondaryText : Color.red)
-        }
-        .onAppear {
-            text = formatted(value)
-        }
-        .onChange(of: text) { _, newValue in
-            let filtered = sanitized(newValue)
-            if filtered != newValue {
-                text = filtered
-                return
-            }
-
-            if let number = Double(filtered), number > 0, number < 90 {
-                value = number
-            }
-        }
-        .onSubmit {
-            text = formatted(value)
-        }
-    }
-
-    private func sanitized(_ input: String) -> String {
-        var output = ""
-        var hasDecimal = false
-
-        for character in input {
-            if character.isNumber {
-                output.append(character)
-            } else if character == "." && !hasDecimal {
-                output.append(character)
-                hasDecimal = true
-            }
-        }
-
-        return output
-    }
-
-    private func formatted(_ number: Double) -> String {
-        number.rounded() == number ? String(format: "%.0f", number) : String(format: "%.2f", number)
     }
 }
 

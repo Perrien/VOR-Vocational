@@ -15,6 +15,15 @@ struct FlatMap: View {
     /// calibration basis for the 500-NM-wide navigation world.
     static let sourceMapAspect: CGFloat = 1748.0 / 1254.0
 
+    /// The source map's real-world width, in nautical miles. Shared by the
+    /// flight surface and Flight Diagnostics so both compute reception and
+    /// CDI from the same scale.
+    static let widthNM: Double = 500
+
+    /// The source map's real-world height, derived from its own aspect ratio
+    /// so north-south distances use the same NM-per-pixel scale as east-west.
+    static var heightNM: Double { widthNM / Double(sourceMapAspect) }
+
     /// Presentation crop measured from the supplied red guide: x 178...3118,
     /// y 264...2036 in the 3496 × 2508 PNG. Edit these normalized values to
     /// reframe the map without rewriting station, airport, or mission data.

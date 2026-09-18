@@ -22,20 +22,13 @@ struct MapView: View {
 
     @State private var panStart: CGSize?
 
-    private let controlPanelWidth: CGFloat = 240
     private let minZoom: CGFloat = 1
     private let maxZoom: CGFloat = 6
-    /// The source map is authored at 500 NM across.
-    private let mapWidthNM: Double = 500
-    /// The map's real-world height, derived from the artwork's own aspect
-    /// ratio so north-south distances use the same NM-per-pixel scale as
-    /// east-west ones.
-    private var mapHeightNM: Double { mapWidthNM / Double(FlatMap.sourceMapAspect) }
     private let compassRoseMinZoom: CGFloat = 2
 
     var body: some View {
         GeometryReader { geometry in
-            let mapWidth = max(0, geometry.size.width - controlPanelWidth)
+            let mapWidth = geometry.size.width
             let cockpitHeight = CockpitLayout.height(forWidth: mapWidth)
             let mapSize = CGSize(width: mapWidth,
                                  height: max(0, geometry.size.height - cockpitHeight))
@@ -46,43 +39,47 @@ struct MapView: View {
             let nav1Reading = receiverReading(for: session.nav1)
             let nav2Reading = receiverReading(for: session.nav2)
 
-            HStack(spacing: 0) {
-                VStack(spacing: 0) {
-                    mapArea(mapSize: mapSize, imageRect: imageRect, planePos: planePos)
-
-                    CockpitPanel(mapWidth: mapWidth, onSwap: { session.swapNAVReceivers() }) {
-                        PlaneControlView(heading: $session.heading,
-                                         speedKnots: $session.speedKnots,
-                                         isFlying: $session.isFlying,
-                                         timeMultiplier: $session.timeMultiplier,
-                                         isChallengeActive: false)
-                    } nav1: {
-                        NavRadioView(
-                            name: "NAV1",
-                            receiver: $session.nav1,
-                            stations: stations,
-                            reading: nav1Reading.cdiReading
-                        )
-                    } nav2: {
-                        NavRadioView(
-                            name: "NAV2",
-                            receiver: $session.nav2,
-                            stations: stations,
-                            reading: nav2Reading.cdiReading
-                        )
+            VStack(spacing: 0) {
+                mapArea(mapSize: mapSize, imageRect: imageRect, planePos: planePos)
+                    .overlay(alignment: .topTrailing) {
+                        // The window's title bar sits on top of our
+                        // ignoresSafeArea() content, so this needs more
+                        // top clearance than a plain corner inset to stay
+                        // fully clear of it.
+                        ChartButton(showVORs: $session.showVORs,
+                                    visibleVORServiceVolumes: $session.visibleVORServiceVolumes,
+                                    showAirports: $session.showAirports,
+                                    showRadials: $session.showRadials,
+                                    showGrid: $session.showGrid,
+                                    showSightseeingRegions: $session.showSightseeingRegions,
+                                    gridSizeNM: $session.gridSizeNM)
+                            .padding(.top, 40)
+                            .padding(.trailing, 16)
                     }
-                }
 
-                MapControlPanel(zoom: $session.zoom, showVORs: $session.showVORs,
-                                visibleVORServiceVolumes: $session.visibleVORServiceVolumes,
-                                showAirports: $session.showAirports, showRadials: $session.showRadials,
-                                showGrid: $session.showGrid, showSightseeingRegions: $session.showSightseeingRegions,
-                                gridSizeNM: $session.gridSizeNM,
-                                cdiMax: $session.cdiMax,
-                                zoomRange: minZoom...maxZoom)
-                    .frame(width: controlPanelWidth)
+                CockpitPanel(mapWidth: mapWidth, onSwap: { session.swapNAVReceivers() }) {
+                    PlaneControlView(heading: $session.heading,
+                                     speedKnots: $session.speedKnots,
+                                     isFlying: $session.isFlying,
+                                     timeMultiplier: $session.timeMultiplier,
+                                     isChallengeActive: false)
+                } nav1: {
+                    NavRadioView(
+                        name: "NAV1",
+                        receiver: $session.nav1,
+                        stations: stations,
+                        reading: nav1Reading.cdiReading
+                    )
+                } nav2: {
+                    NavRadioView(
+                        name: "NAV2",
+                        receiver: $session.nav2,
+                        stations: stations,
+                        reading: nav2Reading.cdiReading
+                    )
+                }
             }
-            // Re-clamp the pan whenever the zoom changes (e.g. via the slider) so
+            // Re-clamp the pan whenever the zoom changes (e.g. via scroll) so
             // the map never drifts off the visible area.
             .onChange(of: session.zoom) {
                 session.pan = clampedPan(session.pan, zoom: session.zoom, mapSize: mapSize)
@@ -111,7 +108,7 @@ struct MapView: View {
                                mapSize: mapSize,
                                zoom: session.zoom,
                                pan: session.pan,
-                               mapWidthNM: mapWidthNM)
+                               mapWidthNM: FlatMap.widthNM)
             }
 
             if session.showSightseeingRegions {
@@ -120,7 +117,7 @@ struct MapView: View {
                                               mapSize: mapSize,
                                               zoom: session.zoom,
                                               pan: session.pan,
-                                              mapWidthNM: mapWidthNM)
+                                              mapWidthNM: FlatMap.widthNM)
             }
 
             // Radial lines from tuned stations, drawn beneath the station symbols.
@@ -208,7 +205,7 @@ struct MapView: View {
 
     /// The chart's horizontal scale, shared by reception math and flight movement.
     private func pixelsPerNM(in imageRect: CGRect) -> CGFloat {
-        FlatMap.pixelsPerNM(in: imageRect, mapWidthNM: mapWidthNM)
+        FlatMap.pixelsPerNM(in: imageRect, mapWidthNM: FlatMap.widthNM)
     }
 
     /// The radials to draw for the currently received radios, in screen space.
@@ -297,8 +294,8 @@ struct MapView: View {
             obs: receiver.obs,
             normalizedAircraftPosition: session.normalizedAircraftPosition,
             stations: stations,
-            mapWidthNM: mapWidthNM,
-            mapHeightNM: mapHeightNM,
+            mapWidthNM: FlatMap.widthNM,
+            mapHeightNM: FlatMap.heightNM,
             cdiMax: session.cdiMax
         )
     }
@@ -447,132 +444,6 @@ private struct FlightTimerView: View {
             in: mapBounds
         ) else { return }
         normalizedAircraftPosition = nextNormalizedPosition
-    }
-}
-
-// MARK: - Map control panel
-
-/// The right-hand panel for controlling the map view: zoom and layer visibility.
-struct MapControlPanel: View {
-    @Binding var zoom: CGFloat
-    @Binding var showVORs: Bool
-    @Binding var visibleVORServiceVolumes: Set<VORServiceVolume>
-    @Binding var showAirports: Bool
-    @Binding var showRadials: Bool
-    @Binding var showGrid: Bool
-    @Binding var showSightseeingRegions: Bool
-    @Binding var gridSizeNM: Double
-    @Binding var cdiMax: Double
-    let zoomRange: ClosedRange<CGFloat>
-
-    @State private var gridSizeText: String = ""
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            Text("Map")
-                .font(.headline)
-                .foregroundStyle(ControlPalette.accent)
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text("Zoom")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ControlPalette.primaryText)
-                    Spacer()
-                    Text(String(format: "%.1f×", zoom))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(ControlPalette.primaryText)
-                }
-                Slider(value: $zoom, in: zoomRange)
-                    .tint(ControlPalette.accent)
-            }
-
-            CDIMaxField(value: $cdiMax)
-
-            Divider().overlay(ControlPalette.divider)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Layers")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ControlPalette.secondaryText)
-                Toggle("VORs", isOn: $showVORs)
-                    .toggleStyle(.checkbox)
-                    .foregroundStyle(ControlPalette.primaryText)
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(VORServiceVolume.allCases, id: \.self) { serviceVolume in
-                        Toggle(serviceVolume.displayName,
-                               isOn: Binding(
-                                get: { visibleVORServiceVolumes.contains(serviceVolume) },
-                                set: { isVisible in
-                                    if isVisible {
-                                        visibleVORServiceVolumes.insert(serviceVolume)
-                                    } else {
-                                        visibleVORServiceVolumes.remove(serviceVolume)
-                                    }
-                                }
-                            ))
-                            .toggleStyle(.checkbox)
-                            .foregroundStyle(ControlPalette.primaryText)
-                    }
-                }
-                .padding(.leading, 18)
-                Toggle("Airports", isOn: $showAirports)
-                    .toggleStyle(.checkbox)
-                    .foregroundStyle(ControlPalette.primaryText)
-                Toggle("Sightseeing regions", isOn: $showSightseeingRegions)
-                    .toggleStyle(.checkbox)
-                    .foregroundStyle(ControlPalette.primaryText)
-                Toggle("Radials", isOn: $showRadials)
-                    .toggleStyle(.checkbox)
-                    .foregroundStyle(ControlPalette.primaryText)
-                HStack(spacing: 8) {
-                    Toggle("Grid", isOn: $showGrid)
-                        .toggleStyle(.checkbox)
-                        .foregroundStyle(ControlPalette.primaryText)
-
-                    TextField("50", text: $gridSizeText)
-                        .textFieldStyle(.plain)
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(ControlPalette.primaryText)
-                        .frame(width: 42)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 3)
-                        .background(ControlPalette.fieldBackground, in: RoundedRectangle(cornerRadius: 5))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 5)
-                                .stroke(ControlPalette.fieldBorder, lineWidth: 1)
-                        )
-
-                    Text("NM")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(ControlPalette.primaryText)
-                }
-            }
-            Spacer()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(ControlPalette.panelBackground)
-        .tint(ControlPalette.accent)
-        .onAppear {
-            gridSizeText = formattedGridSize(gridSizeNM)
-        }
-        .onChange(of: gridSizeText) { _, newValue in
-            let filtered = newValue.filter { $0.isNumber }
-            if filtered != newValue {
-                gridSizeText = filtered
-            }
-            if let size = Double(filtered), size > 0 {
-                gridSizeNM = size
-            }
-        }
-        .onSubmit {
-            gridSizeText = formattedGridSize(gridSizeNM)
-        }
-    }
-
-    private func formattedGridSize(_ size: Double) -> String {
-        String(format: "%.0f", size)
     }
 }
 
