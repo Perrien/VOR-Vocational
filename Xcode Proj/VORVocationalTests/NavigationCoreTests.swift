@@ -78,6 +78,104 @@ final class NavigationCoreTests: XCTestCase {
         XCTAssertNil(VORNavigation.station(withIdent: "", in: [station]))
     }
 
+    func testNAVReceiverWholeMHzClamps() {
+        var receiver = NAVReceiver()
+        receiver.adjustWhole(by: -1)
+        XCTAssertEqual(receiver.wholeMHz, 108)
+
+        receiver.adjustWhole(by: 20)
+        XCTAssertEqual(receiver.wholeMHz, 117)
+    }
+
+    func testNAVReceiverFineStepWrapsWithoutCarry() {
+        var receiver = NAVReceiver(wholeMHz: 116, fineStep: 19)
+        receiver.adjustFine(by: 1)
+        XCTAssertEqual(receiver.wholeMHz, 116)
+        XCTAssertEqual(receiver.fineStep, 0)
+
+        receiver.adjustFine(by: -1)
+        XCTAssertEqual(receiver.wholeMHz, 116)
+        XCTAssertEqual(receiver.fineStep, 19)
+    }
+
+    func testNAVReceiverFormatsFrequency() {
+        let receiver = NAVReceiver(wholeMHz: 116, fineStep: 16)
+        XCTAssertEqual(receiver.frequencyHundredths, 11680)
+        XCTAssertEqual(receiver.frequencyLabel, "116.80")
+    }
+
+    func testStationLookupByFrequency() {
+        let station = makeStation(identifier: "CTR")
+        XCTAssertEqual(
+            VORNavigation.station(withFrequencyHundredths: 11680, in: [station])?.identifier,
+            "CTR"
+        )
+        XCTAssertNil(VORNavigation.station(withFrequencyHundredths: 10800, in: [station]))
+    }
+
+    func testFrequencyReceiverReadingRespectsRange() {
+        let station = makeStation(identifier: "CTR")
+        let inRange = VORNavigation.receiverReading(
+            frequencyHundredths: 11680,
+            obs: 0,
+            normalizedAircraftPosition: CGPoint(x: 0.5, y: 0.6),
+            stations: [station],
+            mapWidthNM: 500,
+            mapHeightNM: 500,
+            cdiMax: 10
+        )
+        let outOfRange = VORNavigation.receiverReading(
+            frequencyHundredths: 11680,
+            obs: 0,
+            normalizedAircraftPosition: .zero,
+            stations: [station],
+            mapWidthNM: 500,
+            mapHeightNM: 500,
+            cdiMax: 10
+        )
+
+        XCTAssertEqual(inRange.station?.identifier, "CTR")
+        XCTAssertNil(outOfRange.station)
+        assertReading(outOfRange.cdiReading, flag: .off, deflection: 0)
+    }
+
+    func testFreshFlightSessionDefaults() {
+        let position = CGPoint(x: 0.5067, y: 0.6889)
+        let session = FlightSession(normalizedAirportPosition: position)
+
+        assertPoint(session.normalizedAircraftPosition, equals: position)
+        XCTAssertEqual(session.heading, 0)
+        XCTAssertEqual(session.speedKnots, 260)
+        XCTAssertFalse(session.isFlying)
+        XCTAssertEqual(session.timeMultiplier, 1)
+        XCTAssertEqual(session.nav1, NAVReceiver())
+        XCTAssertEqual(session.nav2, NAVReceiver())
+        XCTAssertEqual(session.zoom, 1)
+        XCTAssertEqual(session.pan, .zero)
+        XCTAssertTrue(session.showVORs)
+        XCTAssertEqual(session.visibleVORServiceVolumes, Set(VORServiceVolume.allCases))
+        XCTAssertTrue(session.showAirports)
+        XCTAssertTrue(session.showRadials)
+        XCTAssertFalse(session.showGrid)
+        XCTAssertFalse(session.showSightseeingRegions)
+        XCTAssertEqual(session.gridSizeNM, 50)
+    }
+
+    func testNAVReceiverSwap() {
+        let session = FlightSession(normalizedAirportPosition: .zero)
+        session.nav1 = NAVReceiver(wholeMHz: 116, fineStep: 16, obs: 45)
+        session.nav2 = NAVReceiver(wholeMHz: 110, fineStep: 3, obs: 270)
+        let position = session.normalizedAircraftPosition
+        let heading = session.heading
+
+        session.swapNAVReceivers()
+
+        XCTAssertEqual(session.nav1, NAVReceiver(wholeMHz: 110, fineStep: 3, obs: 270))
+        XCTAssertEqual(session.nav2, NAVReceiver(wholeMHz: 116, fineStep: 16, obs: 45))
+        assertPoint(session.normalizedAircraftPosition, equals: position)
+        XCTAssertEqual(session.heading, heading)
+    }
+
     func testFlightAdvance() {
         let north = FlightPhysics.advance(
             position: CGPoint(x: 50, y: 50),

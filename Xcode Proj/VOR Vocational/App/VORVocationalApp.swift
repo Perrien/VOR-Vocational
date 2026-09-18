@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct VORVocationalApp: App {
+    @State private var diagnosticsStore = FlightDiagnosticsStore()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(diagnosticsStore)
         }
     }
 }

@@ -59,6 +59,54 @@ enum VORNavigation {
         return stations.first { $0.ident == key }
     }
 
+    /// Finds a station by its exact frequency channel, without considering range.
+    static func station(withFrequencyHundredths frequencyHundredths: Int, in stations: [VORStation]) -> VORStation? {
+        stations.first {
+            Int(($0.frequency * 100).rounded()) == frequencyHundredths
+        }
+    }
+
+    /// Resolves reception and CDI state for a frequency-tuned receiver.
+    static func receiverReading(
+        frequencyHundredths: Int,
+        obs: Int,
+        normalizedAircraftPosition: CGPoint,
+        stations: [VORStation],
+        mapWidthNM: Double,
+        mapHeightNM: Double,
+        cdiMax: Double
+    ) -> ReceiverReading {
+        guard
+            let station = station(withFrequencyHundredths: frequencyHundredths, in: stations),
+            distanceNM(
+                fromNormalized: normalizedAircraftPosition,
+                toNormalized: station.relativePosition,
+                mapWidthNM: mapWidthNM,
+                mapHeightNM: mapHeightNM
+            ) <= station.rangeNM
+        else {
+            return ReceiverReading(station: nil, cdiReading: .off)
+        }
+
+        let planePositionNM = CGPoint(
+            x: normalizedAircraftPosition.x * mapWidthNM,
+            y: normalizedAircraftPosition.y * mapHeightNM
+        )
+        let stationPositionNM = CGPoint(
+            x: station.relativePosition.x * mapWidthNM,
+            y: station.relativePosition.y * mapHeightNM
+        )
+        return ReceiverReading(
+            station: station,
+            cdiReading: cdiReading(
+                planePosition: planePositionNM,
+                stationPosition: stationPositionNM,
+                obs: Double(obs),
+                cdiMax: cdiMax
+            )
+        )
+    }
+
     /// Distance in nautical miles between two normalized map-image points
     /// (0...1, same convention as `VORStation.location`), given the chart's
     /// real-world width and height. Unlike `distanceNM(from:to:pixelsPerNM:)`

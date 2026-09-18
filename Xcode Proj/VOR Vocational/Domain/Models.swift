@@ -124,6 +124,10 @@ struct Airport: Identifiable, Decodable {
                 y: imageRect.minY + CGFloat(y) * imageRect.height)
     }
     
+    /// The fixed network of airports on the land of Myosia, loaded from the
+    /// bundled `Airports.json`.
+    static let myosia: [Airport] = loadFromBundle()
+
     /// Loads airports from the bundled Airports.json file.
     static func loadFromBundle() -> [Airport] {
         guard let url = Bundle.main.url(forResource: "Airports", withExtension: "json") else {
@@ -220,4 +224,10 @@ struct CDIReading {
     let flag: Flag
 
     static let off = CDIReading(deflection: 0, flag: .off)
+}
+
+/// The station and CDI result currently available to a frequency-tuned receiver.
+struct ReceiverReading {
+    let station: VORStation?
+    let cdiReading: CDIReading
 }

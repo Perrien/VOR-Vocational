@@ -6,6 +6,16 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		8868DFBB305DB0250047488B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4529A28E3050988E00A19798 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4529A2953050988E00A19798;
+			remoteInfo = "VOR Vocational";
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		4529A2963050988E00A19798 /* VOR Vocational.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "VOR Vocational.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		8868DF34305D74330047488B /* VORVocationalTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VORVocationalTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -120,6 +130,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				8868DFBC305DB0250047488B /* PBXTargetDependency */,
 			);
 			name = VORVocationalTests;
 			packageProductDependencies = (
@@ -199,6 +210,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		8868DFBC305DB0250047488B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4529A2953050988E00A19798 /* VOR Vocational */;
+			targetProxy = 8868DFBB305DB0250047488B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		4529A29F3050988F00A19798 /* Debug */ = {

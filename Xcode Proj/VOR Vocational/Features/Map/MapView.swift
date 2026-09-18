@@ -3,6 +3,12 @@ import AppKit
 
 /// A flat map with VOR stations and a draggable plane, plus NAV radios below it.
 struct MapView: View {
+    @Bindable var session: FlightSession
+
+    init(session: FlightSession) {
+        _session = Bindable(session)
+    }
+
     // The fixed VOR beacons on the land of Myosia.
     private let stations: [VORStation] = VORStation.myosia
     // The fixed list of airports loaded once.
@@ -10,62 +16,14 @@ struct MapView: View {
     // The fixed list of named sightseeing regions loaded once.
     private let sightseeingRegions: [SightseeingRegion] = SightseeingRegion.myosia
 
-    // The plane's current position, in the coordinate space of the map.
-    // `nil` until the view lays out, at which point we center the plane.
-    @State private var planePosition: CGPoint?
-
     // The plane's position when the current drag began, used to compute the
     // running offset while dragging.
     @State private var dragStartPosition: CGPoint?
 
-    // The station identifiers the two NAV radios are tuned to (e.g. "CTR").
-    // Empty or unrecognized means no station is tuned.
-    @State private var nav1Ident: String = ""
-    @State private var nav2Ident: String = ""
-
-    // The course selected on each radio's OBS (0–360°).
-    @State private var nav1OBS: Double = 0
-    @State private var nav2OBS: Double = 0
-
-    // The maximum angular deviation represented by full-scale CDI deflection.
-    @State private var cdiMax: Double = 10
-
     // Both NAV radios use the same presentation selected in the map panel.
     @State private var navigationInstrumentStyle: NavigationInstrumentStyle = .cdi
 
-    // The plane's magnetic heading (0–360°, 0 = north/up).
-    @State private var heading: Double = 0
-
-    // The plane's true airspeed in knots and whether the flight loop is running.
-    @State private var speedKnots: Double = 120
-    @State private var isFlying: Bool = false
-
-    // Simulated-time playback multiplier: speeds up the plane's movement on
-    // the map without changing the displayed airspeed.
-    @State private var timeMultiplier: Double = 1
-
-    // Map camera: zoom factor and pan offset (in screen points, applied to the
-    // scaled map content). `panStart` snapshots the offset when a pan begins.
-    // The supplied crop already provides the default framing. Additional zoom
-    // and pan remain available as interactive camera controls.
-    @State private var zoom: CGFloat = 1
-    @State private var pan: CGSize = .zero
     @State private var panStart: CGSize?
-
-    // Which object layers are visible.
-    @State private var showVORs: Bool = true
-    @State private var visibleVORServiceVolumes: Set<VORServiceVolume> = Set(VORServiceVolume.allCases)
-    @State private var showAirports: Bool = true
-    @State private var showRadials: Bool = true
-    @State private var showGrid: Bool = false
-    @State private var showSightseeingRegions: Bool = false
-    @State private var gridSizeNM: Double = 50
-    // The station whose map details are currently expanded.
-    @State private var selectedVORID: String?
-
-    // The "find your position" challenge: inactive, waiting for a guess
-    // against a hidden target, or revealed with a scored result.
-    @State private var positionChallenge: PositionChallenge.State = .inactive
 
     private let panelHeight: CGFloat = 350
     private let controlPanelWidth: CGFloat = 240
@@ -75,7 +33,7 @@ struct MapView: View {
     private let mapWidthNM: Double = 500
     /// The map's real-world height, derived from the artwork's own aspect
     /// ratio so north-south distances use the same NM-per-pixel scale as
-    /// east-west ones (see `VORNavigation.distanceNM(fromNormalized:...)`).
+    /// east-west ones.
     private var mapHeightNM: Double { mapWidthNM / Double(FlatMap.sourceMapAspect) }
     private let compassRoseMinZoom: CGFloat = 2
 
@@ -86,53 +44,38 @@ struct MapView: View {
             // The cropped map image is aspect-fit inside the map area, so
             // everything on the map is positioned relative to this fitted rect.
             let imageRect = FlatMap.fittedRect(in: mapSize)
-            let planePos = planePosition ?? CGPoint(x: imageRect.midX, y: imageRect.midY)
-
-            // Convert the plane position through the display crop back to the
-            // full-source normalized coordinates used by bundled content.
-            let normalizedPlanePosition: CGPoint? = {
-                guard let planePosition = planePosition else { return nil }
-                return FlatMap.sourcePosition(for: planePosition, in: imageRect)
-            }()
-            // NAV reception/CDI/radials measure against the hidden challenge
-            // target while one is active, so dragging the guess marker never
-            // moves the needle — only against the live plane otherwise.
-            let referencePos = referencePosition(planePos: planePos, imageRect: imageRect)
-            let nav1Station = receivedStation(forIdent: nav1Ident,
-                                              planePos: referencePos,
-                                              imageRect: imageRect)
-            let nav2Station = receivedStation(forIdent: nav2Ident,
-                                              planePos: referencePos,
-                                              imageRect: imageRect)
+            let planePos = FlatMap.point(for: session.normalizedAircraftPosition, in: imageRect)
+            let nav1Reading = receiverReading(for: session.nav1)
+            let nav2Reading = receiverReading(for: session.nav2)
 
             HStack(spacing: 0) {
                 VStack(spacing: 0) {
                     mapArea(mapSize: mapSize, imageRect: imageRect, planePos: planePos)
 
                     HStack(spacing: 16) {
-                        PlaneControlView(heading: $heading,
-                                         speedKnots: $speedKnots,
-                                         isFlying: $isFlying,
-                                         timeMultiplier: $timeMultiplier,
-                                         isChallengeActive: isChallengeActive)
+                        PlaneControlView(heading: $session.heading,
+                                         speedKnots: $session.speedKnots,
+                                         isFlying: $session.isFlying,
+                                         timeMultiplier: $session.timeMultiplier,
+                                         isChallengeActive: false)
 
                         NavRadioView(
                             name: "NAV1",
-                            ident: $nav1Ident,
-                            obs: $nav1OBS,
-                            heading: heading,
+                            ident: receivedIdentBinding(for: .nav1),
+                            obs: obsBinding(for: .nav1),
+                            heading: session.heading,
                             instrumentStyle: navigationInstrumentStyle,
-                            tunedStation: nav1Station,
-                            reading: { obs in cdiReading(station: nav1Station, obs: obs, cdiMax: cdiMax, planePos: referencePos, imageRect: imageRect) }
+                            tunedStation: nav1Reading.station,
+                            reading: { obs in receiverReading(for: session.nav1, obs: obs).cdiReading }
                         )
                         NavRadioView(
                             name: "NAV2",
-                            ident: $nav2Ident,
-                            obs: $nav2OBS,
-                            heading: heading,
+                            ident: receivedIdentBinding(for: .nav2),
+                            obs: obsBinding(for: .nav2),
+                            heading: session.heading,
                             instrumentStyle: navigationInstrumentStyle,
-                            tunedStation: nav2Station,
-                            reading: { obs in cdiReading(station: nav2Station, obs: obs, cdiMax: cdiMax, planePos: referencePos, imageRect: imageRect) }
+                            tunedStation: nav2Reading.station,
+                            reading: { obs in receiverReading(for: session.nav2, obs: obs).cdiReading }
                         )
                     }
                     .padding(16)
@@ -141,28 +84,23 @@ struct MapView: View {
                     .background(ControlPalette.panelBackground)
                 }
 
-                MapControlPanel(zoom: $zoom, showVORs: $showVORs,
-                                visibleVORServiceVolumes: $visibleVORServiceVolumes,
-                                showAirports: $showAirports, showRadials: $showRadials,
-                                showGrid: $showGrid, showSightseeingRegions: $showSightseeingRegions,
-                                gridSizeNM: $gridSizeNM,
-                                cdiMax: $cdiMax,
+                MapControlPanel(zoom: $session.zoom, showVORs: $session.showVORs,
+                                visibleVORServiceVolumes: $session.visibleVORServiceVolumes,
+                                showAirports: $session.showAirports, showRadials: $session.showRadials,
+                                showGrid: $session.showGrid, showSightseeingRegions: $session.showSightseeingRegions,
+                                gridSizeNM: $session.gridSizeNM,
+                                cdiMax: $session.cdiMax,
                                 navigationInstrumentStyle: $navigationInstrumentStyle,
-                                zoomRange: minZoom...maxZoom,
-                                planePosition: Binding(get: { normalizedPlanePosition }, set: { _ in }),
-                                positionChallenge: positionChallenge,
-                                onStartChallenge: startChallenge,
-                                onCheckPlacement: { checkPlacement(imageRect: imageRect) },
-                                onNewChallenge: startChallenge)
+                                zoomRange: minZoom...maxZoom)
                     .frame(width: controlPanelWidth)
             }
             // Re-clamp the pan whenever the zoom changes (e.g. via the slider) so
             // the map never drifts off the visible area.
-            .onChange(of: zoom) {
-                pan = clampedPan(pan, zoom: zoom, mapSize: mapSize)
+            .onChange(of: session.zoom) {
+                session.pan = clampedPan(session.pan, zoom: session.zoom, mapSize: mapSize)
             }
             .onAppear {
-                pan = clampedPan(pan, zoom: zoom, mapSize: mapSize)
+                session.pan = clampedPan(session.pan, zoom: session.zoom, mapSize: mapSize)
             }
         }
         .ignoresSafeArea()
@@ -176,47 +114,44 @@ struct MapView: View {
             // Map artwork: this is the only layer that scales with zoom.
             FlatMap(imageRect: imageRect)
                 .frame(width: mapSize.width, height: mapSize.height)
-                .scaleEffect(zoom)
-                .offset(pan)
+                .scaleEffect(session.zoom)
+                .offset(session.pan)
 
-            if showGrid {
-                HexGridOverlay(hexHeightNM: gridSizeNM,
+            if session.showGrid {
+                HexGridOverlay(hexHeightNM: session.gridSizeNM,
                                imageRect: imageRect,
                                mapSize: mapSize,
-                               zoom: zoom,
-                               pan: pan,
+                               zoom: session.zoom,
+                               pan: session.pan,
                                mapWidthNM: mapWidthNM)
             }
 
-            if showSightseeingRegions {
+            if session.showSightseeingRegions {
                 SightseeingCheckpointsOverlay(regions: sightseeingRegions,
                                               imageRect: imageRect,
                                               mapSize: mapSize,
-                                              zoom: zoom,
-                                              pan: pan,
+                                              zoom: session.zoom,
+                                              pan: session.pan,
                                               mapWidthNM: mapWidthNM)
             }
 
             // Radial lines from tuned stations, drawn beneath the station symbols.
-            // These measure against the challenge target (not the live plane)
-            // while a challenge is active, matching the NAV radios above.
-            if showRadials {
-                let radialsReferencePos = referencePosition(planePos: planePos, imageRect: imageRect)
-                RadialsOverlay(radials: tunedRadials(planePos: radialsReferencePos, imageRect: imageRect, mapSize: mapSize),
+            if session.showRadials {
+                RadialsOverlay(radials: tunedRadials(imageRect: imageRect, mapSize: mapSize),
                                length: max(mapSize.width, mapSize.height) * 3)
                     .allowsHitTesting(false)
             }
 
             // Marker layer: constant size, manually transformed to track the map.
-            if showVORs {
+            if session.showVORs {
                 ForEach(stations) { station in
-                    if visibleVORServiceVolumes.contains(station.serviceVolume) {
+                    if session.visibleVORServiceVolumes.contains(station.serviceVolume) {
                         let stationPoint = point(for: station, in: imageRect)
                         let screenStationPoint = screenPoint(stationPoint, mapSize: mapSize)
-                        let showsCompassRose = selectedVORID == station.id && zoom >= compassRoseMinZoom
+                        let showsCompassRose = session.selectedVORID == station.id && session.zoom >= compassRoseMinZoom
 
-                        if selectedVORID == station.id {
-                            VORServiceRangeRing(radius: serviceRangeRadius(for: station, imageRect: imageRect) * zoom)
+                        if session.selectedVORID == station.id {
+                            VORServiceRangeRing(radius: serviceRangeRadius(for: station, imageRect: imageRect) * session.zoom)
                                 .position(screenStationPoint)
                         }
 
@@ -225,16 +160,16 @@ struct MapView: View {
                                 .position(screenStationPoint)
                         }
 
-                        VORStationView(station: station, isSelected: selectedVORID == station.id)
+                        VORStationView(station: station, isSelected: session.selectedVORID == station.id)
                             .position(screenStationPoint)
                             .onTapGesture {
-                                selectedVORID = selectedVORID == station.id ? nil : station.id
+                                session.selectedVORID = session.selectedVORID == station.id ? nil : station.id
                             }
                         }
                     }
             }
 
-            if showAirports {
+            if session.showAirports {
                 ForEach(airports) { airport in
                     AirportMarkerView(airport: airport)
                         .position(screenPoint(point(for: CGPoint(x: airport.x, y: airport.y), in: imageRect),
@@ -256,29 +191,18 @@ struct MapView: View {
                     .allowsHitTesting(false)
             }
 
-            PlaneIcon(heading: heading)
+            PlaneIcon(heading: session.heading)
                 .position(screenPoint(planePos, mapSize: mapSize))
                 // The plane's own drag wins over panning when the drag starts on it.
                 .highPriorityGesture(planeDrag(planePos: planePos, imageRect: imageRect))
 
-            FlightTimerView(planePosition: $planePosition,
-                            heading: $heading,
-                            speedKnots: $speedKnots,
-                            isFlying: $isFlying,
-                            timeMultiplier: $timeMultiplier,
-                            initialPosition: planePos,
+            FlightTimerView(normalizedAircraftPosition: $session.normalizedAircraftPosition,
+                            heading: $session.heading,
+                            speedKnots: $session.speedKnots,
+                            isFlying: $session.isFlying,
+                            timeMultiplier: $session.timeMultiplier,
                             mapBounds: imageRect,
                             pixelsPerNM: pixelsPerNM(in: imageRect))
-
-            // Once checked, show the hidden target and how far the guess was.
-            // `result.guess`/`result.target` are already in map space.
-            if case .revealed(let result) = positionChallenge {
-                PositionChallengeOverlay(
-                    guessPoint: screenPoint(result.guess, mapSize: mapSize),
-                    targetPoint: screenPoint(result.target, mapSize: mapSize)
-                )
-                .allowsHitTesting(false)
-            }
         }
         .frame(width: mapSize.width, height: mapSize.height)
         .clipped()
@@ -299,13 +223,13 @@ struct MapView: View {
         FlatMap.pixelsPerNM(in: imageRect, mapWidthNM: mapWidthNM)
     }
 
-    /// The radials to draw for the currently tuned radios, in screen space.
-    private func tunedRadials(planePos: CGPoint, imageRect: CGRect, mapSize: CGSize) -> [Radial] {
+    /// The radials to draw for the currently received radios, in screen space.
+    private func tunedRadials(imageRect: CGRect, mapSize: CGSize) -> [Radial] {
         var result: [Radial] = []
-        for (ident, obs) in [(nav1Ident, nav1OBS), (nav2Ident, nav2OBS)] {
-            if let station = receivedStation(forIdent: ident, planePos: planePos, imageRect: imageRect) {
+        for receiver in [session.nav1, session.nav2] {
+            if let station = receiverReading(for: receiver).station {
                 let origin = screenPoint(point(for: station, in: imageRect), mapSize: mapSize)
-                result.append(Radial(origin: origin, courseDegrees: obs))
+                result.append(Radial(origin: origin, courseDegrees: Double(receiver.obs)))
             }
         }
         return result
@@ -316,8 +240,8 @@ struct MapView: View {
     private func screenPoint(_ p: CGPoint, mapSize: CGSize) -> CGPoint {
         let cx = mapSize.width / 2, cy = mapSize.height / 2
         return CGPoint(
-            x: (p.x - cx) * zoom + cx + pan.width,
-            y: (p.y - cy) * zoom + cy + pan.height
+            x: (p.x - cx) * session.zoom + cx + session.pan.width,
+            y: (p.y - cy) * session.zoom + cy + session.pan.height
         )
     }
 
@@ -329,10 +253,15 @@ struct MapView: View {
                 let start = dragStartPosition ?? planePos
                 if dragStartPosition == nil { dragStartPosition = start }
                 let proposed = CGPoint(
-                    x: start.x + value.translation.width / zoom,
-                    y: start.y + value.translation.height / zoom
+                    x: start.x + value.translation.width / session.zoom,
+                    y: start.y + value.translation.height / session.zoom
                 )
-                planePosition = clamp(proposed, in: imageRect)
+                if let normalizedPosition = FlatMap.sourcePosition(
+                    for: clamp(proposed, in: imageRect),
+                    in: imageRect
+                ) {
+                    session.normalizedAircraftPosition = normalizedPosition
+                }
             }
             .onEnded { _ in dragStartPosition = nil }
     }
@@ -341,11 +270,11 @@ struct MapView: View {
     private func panGesture(mapSize: CGSize) -> some Gesture {
         DragGesture(coordinateSpace: .named(mapSpace))
             .onChanged { value in
-                let start = panStart ?? pan
+                let start = panStart ?? session.pan
                 if panStart == nil { panStart = start }
                 let proposed = CGSize(width: start.width + value.translation.width,
                                       height: start.height + value.translation.height)
-                pan = clampedPan(proposed, zoom: zoom, mapSize: mapSize)
+                session.pan = clampedPan(proposed, zoom: session.zoom, mapSize: mapSize)
             }
             .onEnded { _ in panStart = nil }
     }
@@ -371,71 +300,47 @@ struct MapView: View {
     /// delta (scroll up) zooms in. Pan is re-clamped by `onChange(of: zoom)`.
     private func applyZoomDelta(_ deltaY: CGFloat, mapSize: CGSize) {
         let factor = 1 + deltaY * 0.08
-        zoom = min(max(zoom * factor, minZoom), maxZoom)
+        session.zoom = min(max(session.zoom * factor, minZoom), maxZoom)
     }
 
-    // MARK: - Position challenge
+    private enum Receiver { case nav1, nav2 }
 
-    private var isChallengeActive: Bool {
-        if case .active = positionChallenge { return true }
-        return false
+    private func receiverReading(for receiver: NAVReceiver, obs: Double? = nil) -> ReceiverReading {
+        VORNavigation.receiverReading(
+            frequencyHundredths: receiver.frequencyHundredths,
+            obs: Int((obs ?? Double(receiver.obs)).rounded()),
+            normalizedAircraftPosition: session.normalizedAircraftPosition,
+            stations: stations,
+            mapWidthNM: mapWidthNM,
+            mapHeightNM: mapHeightNM,
+            cdiMax: session.cdiMax
+        )
     }
 
-    /// The position NAV reception, CDI, and radials should measure against:
-    /// the hidden target while a challenge is active or revealed (so dragging
-    /// the guess marker never moves the needle), otherwise the live plane.
-    private func referencePosition(planePos: CGPoint, imageRect: CGRect) -> CGPoint {
-        switch positionChallenge {
-        case .inactive:
-            return planePos
-        case .active(let target):
-            return point(for: target, in: imageRect)
-        case .revealed(let result):
-            return result.target
-        }
+    private func obsBinding(for receiver: Receiver) -> Binding<Double> {
+        Binding(
+            get: { Double(receiver == .nav1 ? session.nav1.obs : session.nav2.obs) },
+            set: { newValue in
+                let value = Int(newValue.rounded()).quotientAndRemainder(dividingBy: 360).remainder
+                if receiver == .nav1 {
+                    session.nav1.obs = value < 0 ? value + 360 : value
+                } else {
+                    session.nav2.obs = value < 0 ? value + 360 : value
+                }
+            }
+        )
     }
 
-    /// Starts a new challenge: hides a fresh random target reachable by at
-    /// least 3 VORs (so the player has enough radials to fix a position, not
-    /// just one line), resets the guess marker (the plane) to the map
-    /// center, and stops any animated flight so it can't fight with manual
-    /// guess placement.
-    private func startChallenge() {
-        let target = PositionChallenge.randomTarget(stations: stations, mapWidthNM: mapWidthNM,
-                                                     mapHeightNM: mapHeightNM,
-                                                     normalizedBounds: FlatMap.sourceCrop,
-                                                     minInRangeStations: 3)
-        positionChallenge = .active(target: target)
-        planePosition = nil
-        isFlying = false
-    }
-
-    /// Scores the current guess (wherever the plane marker has been dragged)
-    /// against the hidden target and reveals the result.
-    private func checkPlacement(imageRect: CGRect) {
-        guard case .active(let target) = positionChallenge else { return }
-        let guessPoint = planePosition ?? CGPoint(x: imageRect.midX, y: imageRect.midY)
-        let targetPoint = point(for: target, in: imageRect)
-        let result = PositionChallenge.score(guess: guessPoint, target: targetPoint,
-                                             pixelsPerNM: pixelsPerNM(in: imageRect))
-        positionChallenge = .revealed(result)
-    }
-
-    /// The station the radio can currently receive. The identifier remains in
-    /// the radio while out of range, so reception returns as soon as the plane
-    /// crosses back into the station's service volume.
-    private func receivedStation(forIdent ident: String, planePos: CGPoint, imageRect: CGRect) -> VORStation? {
-        guard let station = VORNavigation.station(withIdent: ident, in: stations) else { return nil }
-        let stationPoint = point(for: station, in: imageRect)
-        let distance = distanceNM(from: planePos, to: stationPoint, imageRect: imageRect)
-        return distance <= station.serviceVolume.rangeNM ? station : nil
-    }
-
-    /// Converts map-space pixels to nautical miles using the source chart's
-    /// 500 NM width. Both points are unscaled map coordinates, so zoom does not
-    /// change the simulated distance.
-    private func distanceNM(from planePoint: CGPoint, to stationPoint: CGPoint, imageRect: CGRect) -> Double {
-        VORNavigation.distanceNM(from: planePoint, to: stationPoint, pixelsPerNM: pixelsPerNM(in: imageRect))
+    /// The legacy radio view remains until T4 adds frequency knobs. Its
+    /// identifier display derives from reception and never stores an ident.
+    private func receivedIdentBinding(for receiver: Receiver) -> Binding<String> {
+        Binding(
+            get: {
+                let navReceiver = receiver == .nav1 ? session.nav1 : session.nav2
+                return receiverReading(for: navReceiver).station?.ident ?? ""
+            },
+            set: { _ in }
+        )
     }
 
     /// Converts a station's service volume into an unscaled map-space radius.
@@ -453,27 +358,17 @@ struct MapView: View {
         FlatMap.point(for: relativePosition, in: rect)
     }
 
-    /// Computes the CDI needle deflection and TO/FROM flag for a radio tuned to
-    /// `station` with the OBS set to `obs`, given the plane's position.
-    private func cdiReading(station: VORStation?, obs: Double, cdiMax: Double,
-                            planePos: CGPoint, imageRect: CGRect) -> CDIReading {
-        guard let station else { return .off }
-        let stationPoint = point(for: station, in: imageRect)
-        return VORNavigation.cdiReading(planePosition: planePos, stationPosition: stationPoint,
-                                        obs: obs, cdiMax: cdiMax)
-    }
 }
 
 /// Advances the plane while flight is enabled. The bindings keep the loop tied
 /// to the latest heading and speed even while the controls are being edited.
 private struct FlightTimerView: View {
-    @Binding var planePosition: CGPoint?
+    @Binding var normalizedAircraftPosition: CGPoint
     @Binding var heading: Double
     @Binding var speedKnots: Double
     @Binding var isFlying: Bool
     @Binding var timeMultiplier: Double
 
-    let initialPosition: CGPoint
     let mapBounds: CGRect
     let pixelsPerNM: CGFloat
 
@@ -501,7 +396,7 @@ private struct FlightTimerView: View {
     }
 
     private func advancePlane(by elapsed: TimeInterval) {
-        let currentPosition = planePosition ?? initialPosition
+        let currentPosition = FlatMap.point(for: normalizedAircraftPosition, in: mapBounds)
         let localPosition = CGPoint(x: currentPosition.x - mapBounds.minX,
                                     y: currentPosition.y - mapBounds.minY)
         let nextLocalPosition = FlightPhysics.advance(position: localPosition, heading: heading,
@@ -509,8 +404,12 @@ private struct FlightTimerView: View {
                                                        elapsed: elapsed * timeMultiplier,
                                                        pixelsPerNM: pixelsPerNM,
                                                        bounds: mapBounds.size)
-        planePosition = CGPoint(x: nextLocalPosition.x + mapBounds.minX,
-                                y: nextLocalPosition.y + mapBounds.minY)
+        guard let nextNormalizedPosition = FlatMap.sourcePosition(
+            for: CGPoint(x: nextLocalPosition.x + mapBounds.minX,
+                         y: nextLocalPosition.y + mapBounds.minY),
+            in: mapBounds
+        ) else { return }
+        normalizedAircraftPosition = nextNormalizedPosition
     }
 }
 
@@ -529,14 +428,6 @@ struct MapControlPanel: View {
     @Binding var cdiMax: Double
     @Binding var navigationInstrumentStyle: NavigationInstrumentStyle
     let zoomRange: ClosedRange<CGFloat>
-
-    // Added optional planePosition binding to show normalized plane coordinates
-    var planePosition: Binding<CGPoint?>?
-
-    var positionChallenge: PositionChallenge.State = .inactive
-    var onStartChallenge: () -> Void = {}
-    var onCheckPlacement: () -> Void = {}
-    var onNewChallenge: () -> Void = {}
 
     @State private var gridSizeText: String = ""
 
@@ -574,13 +465,6 @@ struct MapControlPanel: View {
                 .pickerStyle(.radioGroup)
                 .labelsHidden()
             }
-
-            Divider().overlay(ControlPalette.divider)
-
-            PositionChallengePanel(state: positionChallenge,
-                                   onStart: onStartChallenge,
-                                   onCheck: onCheckPlacement,
-                                   onReset: onNewChallenge)
 
             Divider().overlay(ControlPalette.divider)
 
@@ -641,31 +525,6 @@ struct MapControlPanel: View {
                         .foregroundStyle(ControlPalette.primaryText)
                 }
             }
-            
-            // Insert the Plane position section here
-            if let planePosition = planePosition {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Plane position")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ControlPalette.secondaryText)
-                    if let rel = planePosition.wrappedValue {
-                        Text(String(format: "X: %.4f", rel.x))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(ControlPalette.primaryText)
-                        Text(String(format: "Y: %.4f", rel.y))
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(ControlPalette.primaryText)
-                    } else {
-                        Text("X: --")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(ControlPalette.primaryText)
-                        Text("Y: --")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(ControlPalette.primaryText)
-                    }
-                }
-            }
-
             Spacer()
         }
         .padding(16)
@@ -736,6 +595,6 @@ struct ScrollWheelReader: NSViewRepresentable {
 }
 
 #Preview {
-    MapView()
+    MapView(session: FlightSession(normalizedAirportPosition: .zero))
         .frame(width: 1100, height: 760)
 }
