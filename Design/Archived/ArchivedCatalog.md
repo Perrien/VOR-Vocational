@@ -1,2 +1,3 @@
 - 2026-09-17 · BuildPlan · superseded by shipped code — implementation assumptions no longer match
 - 2026-09-17 · Chore-Complete-Execution-Protocol · executed
+- 2026-09-18 · V0.1-Stable-Core · executed
