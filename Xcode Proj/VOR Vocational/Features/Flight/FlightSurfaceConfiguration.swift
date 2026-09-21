@@ -11,6 +11,9 @@ struct FlightSurfaceConfiguration: Equatable {
     let allowsAircraftSimulation: Bool
     let showsHeadingPresentation: Bool
     let showsFlightControls: Bool
+    /// When false, the surface does not reveal or allow dragging the aircraft's
+    /// exact chart position. Radios and simulation continue using that position.
+    let showsAircraftMarker: Bool
 
     /// The unconstrained baseline used by Free Flight.
     static let freeFlight = FlightSurfaceConfiguration(
@@ -18,7 +21,8 @@ struct FlightSurfaceConfiguration: Equatable {
         showsSightseeingRegionNamesByDefault: true,
         allowsAircraftSimulation: true,
         showsHeadingPresentation: true,
-        showsFlightControls: true
+        showsFlightControls: true,
+        showsAircraftMarker: true
     )
 
     /// Position Challenge uses the plane icon as a stationary guess marker.
@@ -29,6 +33,18 @@ struct FlightSurfaceConfiguration: Equatable {
         showsSightseeingRegionNamesByDefault: false,
         allowsAircraftSimulation: false,
         showsHeadingPresentation: true,
-        showsFlightControls: false
+        showsFlightControls: false,
+        showsAircraftMarker: true
+    )
+
+    /// The first supplied mission uses the normal live cockpit while keeping
+    /// the aircraft's true chart location hidden from the player.
+    static let transportMission = FlightSurfaceConfiguration(
+        showsAirportsByDefault: true,
+        showsSightseeingRegionNamesByDefault: false,
+        allowsAircraftSimulation: true,
+        showsHeadingPresentation: true,
+        showsFlightControls: true,
+        showsAircraftMarker: false
     )
 }

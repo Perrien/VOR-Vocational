@@ -212,10 +212,12 @@ struct MapView<ChartOverlay: View>: View {
                 }
             }
 
-            PlaneIcon(heading: session.heading)
-                .position(screenPoint(planePos, mapSize: mapSize))
-                // The plane's own drag wins over panning when the drag starts on it.
-                .highPriorityGesture(planeDrag(planePos: planePos, imageRect: imageRect))
+            if configuration.showsAircraftMarker {
+                PlaneIcon(heading: session.heading)
+                    .position(screenPoint(planePos, mapSize: mapSize))
+                    // The plane's own drag wins over panning when the drag starts on it.
+                    .highPriorityGesture(planeDrag(planePos: planePos, imageRect: imageRect))
+            }
 
             if configuration.allowsAircraftSimulation {
                 FlightTimerView(normalizedAircraftPosition: $session.normalizedAircraftPosition,
@@ -223,6 +225,7 @@ struct MapView<ChartOverlay: View>: View {
                                 speedKnots: $session.speedKnots,
                                 isFlying: $session.isFlying,
                                 timeMultiplier: $session.timeMultiplier,
+                                elapsedSimulatedSeconds: $session.elapsedSimulatedSeconds,
                                 mapBounds: imageRect,
                                 pixelsPerNM: pixelsPerNM(in: imageRect))
             }
@@ -440,6 +443,7 @@ private struct FlightTimerView: View {
     @Binding var speedKnots: Double
     @Binding var isFlying: Bool
     @Binding var timeMultiplier: Double
+    @Binding var elapsedSimulatedSeconds: TimeInterval
 
     let mapBounds: CGRect
     let pixelsPerNM: CGFloat
@@ -468,12 +472,15 @@ private struct FlightTimerView: View {
     }
 
     private func advancePlane(by elapsed: TimeInterval) {
+        let simulatedElapsed = elapsed * timeMultiplier
+        elapsedSimulatedSeconds += simulatedElapsed
+
         let currentPosition = FlatMap.point(for: normalizedAircraftPosition, in: mapBounds)
         let localPosition = CGPoint(x: currentPosition.x - mapBounds.minX,
                                     y: currentPosition.y - mapBounds.minY)
         let nextLocalPosition = FlightPhysics.advance(position: localPosition, heading: heading,
                                                        speedKnots: speedKnots,
-                                                       elapsed: elapsed * timeMultiplier,
+                                                       elapsed: simulatedElapsed,
                                                        pixelsPerNM: pixelsPerNM,
                                                        bounds: mapBounds.size)
         guard let nextNormalizedPosition = FlatMap.sourcePosition(

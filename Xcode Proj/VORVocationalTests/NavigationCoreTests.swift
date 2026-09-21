@@ -181,6 +181,7 @@ final class NavigationCoreTests: XCTestCase {
         XCTAssertEqual(session.speedKnots, 260)
         XCTAssertFalse(session.isFlying)
         XCTAssertEqual(session.timeMultiplier, 1)
+        XCTAssertEqual(session.elapsedSimulatedSeconds, 0)
         XCTAssertEqual(session.nav1, NAVReceiver())
         XCTAssertEqual(session.nav2, NAVReceiver())
         XCTAssertEqual(session.zoom, 1)
@@ -204,7 +205,8 @@ final class NavigationCoreTests: XCTestCase {
                 showsSightseeingRegionNamesByDefault: true,
                 allowsAircraftSimulation: true,
                 showsHeadingPresentation: true,
-                showsFlightControls: true
+                showsFlightControls: true,
+                showsAircraftMarker: true
             )
         )
         XCTAssertEqual(
@@ -214,7 +216,19 @@ final class NavigationCoreTests: XCTestCase {
                 showsSightseeingRegionNamesByDefault: false,
                 allowsAircraftSimulation: false,
                 showsHeadingPresentation: true,
-                showsFlightControls: false
+                showsFlightControls: false,
+                showsAircraftMarker: true
+            )
+        )
+        XCTAssertEqual(
+            .transportMission,
+            FlightSurfaceConfiguration(
+                showsAirportsByDefault: true,
+                showsSightseeingRegionNamesByDefault: false,
+                allowsAircraftSimulation: true,
+                showsHeadingPresentation: true,
+                showsFlightControls: true,
+                showsAircraftMarker: false
             )
         )
     }
@@ -549,6 +563,58 @@ final class NavigationCoreTests: XCTestCase {
         XCTAssertNil(terminalStep.distanceNM)
         assertGuidance(terminalStep.guidance,
                        ident: "ELS", frequencyMHz: 112, obsDegrees: 353, flag: .from)
+    }
+
+    func testMissionFlightProgressRequiresExplicitAdvance() {
+        var progress = MissionFlightProgress(instructionCount: 5)
+
+        XCTAssertEqual(progress.activeInstructionIndex, 0)
+        XCTAssertEqual(progress.activeInstructionNumber, 1)
+        XCTAssertTrue(progress.canAdvance)
+
+        for expectedIndex in 1...4 {
+            XCTAssertTrue(progress.advanceInstruction())
+            XCTAssertEqual(progress.activeInstructionIndex, expectedIndex)
+            XCTAssertEqual(progress.activeInstructionNumber, expectedIndex + 1)
+        }
+
+        XCTAssertFalse(progress.canAdvance)
+        XCTAssertFalse(progress.advanceInstruction())
+        XCTAssertEqual(progress.activeInstructionIndex, 4)
+    }
+
+    func testMissionFlightCompletionMeasuresRawDistanceFromDestination() throws {
+        let plan = try FlightPlanCatalog.load(named: "SilverkeepToMidland")
+        let resolved = try FlightPlanResolver.resolve(
+            plan,
+            airports: Airport.myosia,
+            stations: VORStation.myosia,
+            mapWidthNM: FlatMap.widthNM,
+            mapHeightNM: FlatMap.heightNM,
+            cruiseSpeedKnots: 260
+        )
+        let destination = try XCTUnwrap(resolved.points.last)
+
+        let atDestination = MissionFlightCompletion(
+            resolvedPlan: resolved,
+            aircraftPosition: destination.normalizedPosition,
+            simulatedElapsedSeconds: 321,
+            mapWidthNM: FlatMap.widthNM,
+            mapHeightNM: FlatMap.heightNM
+        )
+        let fiftyNMWest = MissionFlightCompletion(
+            resolvedPlan: resolved,
+            aircraftPosition: CGPoint(x: destination.normalizedPosition.x - 0.1,
+                                      y: destination.normalizedPosition.y),
+            simulatedElapsedSeconds: 654,
+            mapWidthNM: FlatMap.widthNM,
+            mapHeightNM: FlatMap.heightNM
+        )
+
+        XCTAssertEqual(atDestination.simulatedElapsedSeconds, 321)
+        XCTAssertEqual(atDestination.distanceFromDestinationNM, 0, accuracy: 0.000_001)
+        XCTAssertEqual(fiftyNMWest.simulatedElapsedSeconds, 654)
+        XCTAssertEqual(fiftyNMWest.distanceFromDestinationNM, 50, accuracy: 0.000_001)
     }
 
     func testFlightPlanCatalogNamesMissingBundleResource() {

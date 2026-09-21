@@ -44,6 +44,9 @@ final class FlightSession {
     var speedKnots: Double = 260
     var isFlying = false
     var timeMultiplier: Double = 1
+    /// Elapsed simulation time, including the selected playback multiplier.
+    /// A mission completion records this value; it is not a score or ETA.
+    var elapsedSimulatedSeconds: TimeInterval = 0
     var nav1 = NAVReceiver()
     var nav2 = NAVReceiver()
 
