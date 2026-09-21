@@ -366,11 +366,9 @@ struct NavRadioView: View {
     /// The CDI reading for the receiver's current frequency and OBS.
     let reading: CDIReading
     /// Where reception range is measured from — the plane in Free Flight, or
-    /// Position Challenge's hidden target — so a typed ident only resolves
-    /// once its station is actually receivable from here. Real avionics only
-    /// let you confirm an ident's Morse code in range; auto-filling a
-    /// frequency for an out-of-range station would leak the same information
-    /// for free.
+    /// Position Challenge's hidden target. A typed ident selects its station's
+    /// frequency, while range from this point determines whether the radio is
+    /// actually receiving it.
     let normalizedAircraftPosition: CGPoint
     let mapWidthNM: Double
     let mapHeightNM: Double
@@ -471,17 +469,17 @@ struct NavRadioView: View {
         )
     }
 
-    /// Normalizes typed input and, the moment it resolves to a known
-    /// station, tunes the receiver's frequency to match.
+    /// Normalizes typed input and, the moment it resolves to a known station,
+    /// tunes the receiver's frequency to match. Reception still remains off
+    /// until the aircraft enters that station's service range, but the selected
+    /// frequency is retained so it can become live automatically in flight.
     private var identTextBinding: Binding<String> {
         Binding(
             get: { identText },
             set: { newValue in
                 identText = String(newValue.uppercased().prefix(3))
-                if let station = matchedStation {
+                if let station = VORNavigation.station(withIdent: identText, in: stations) {
                     receiver.tune(toFrequencyHundredths: Int((station.frequency * 100).rounded()))
-                } else if VORNavigation.station(withIdent: identText, in: stations) != nil {
-                    receiver.clearFrequency()
                 }
             }
         )

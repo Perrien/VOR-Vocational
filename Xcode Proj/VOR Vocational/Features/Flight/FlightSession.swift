@@ -77,7 +77,7 @@ final class FlightSession {
     var showRadials = true
     var showGrid = false
     var showSightseeingRegions = false
-    var showSightseeingRegionNames = true
+    var showSightseeingRegionNames = false
     var gridSizeNM: Double = 50
     var selectedVORID: String?
     var cdiMax: Double = 10

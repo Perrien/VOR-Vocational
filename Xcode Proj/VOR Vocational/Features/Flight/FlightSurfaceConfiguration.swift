@@ -18,7 +18,7 @@ struct FlightSurfaceConfiguration: Equatable {
     /// The unconstrained baseline used by Free Flight.
     static let freeFlight = FlightSurfaceConfiguration(
         showsAirportsByDefault: true,
-        showsSightseeingRegionNamesByDefault: true,
+        showsSightseeingRegionNamesByDefault: false,
         allowsAircraftSimulation: true,
         showsHeadingPresentation: true,
         showsFlightControls: true,
