@@ -192,6 +192,7 @@ final class NavigationCoreTests: XCTestCase {
 
         assertPoint(session.normalizedAircraftPosition, equals: position)
         XCTAssertEqual(session.heading, 0)
+        XCTAssertEqual(session.selectedHeading, 0)
         XCTAssertEqual(session.speedKnots, 260)
         XCTAssertFalse(session.isFlying)
         XCTAssertEqual(session.timeMultiplier, 1)
@@ -310,6 +311,29 @@ final class NavigationCoreTests: XCTestCase {
         assertPoint(clamped, equals: CGPoint(x: 100, y: 95))
         assertPoint(stoppedBySpeed, equals: CGPoint(x: 50, y: 50))
         assertPoint(stoppedByScale, equals: CGPoint(x: 50, y: 50))
+    }
+
+    func testFlightTurnMovesTowardSelectedHeadingAtBoundedRate() {
+        XCTAssertEqual(
+            FlightPhysics.turn(heading: 0, toward: 90, elapsed: 2),
+            6,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            FlightPhysics.turn(heading: 358, toward: 2, elapsed: 1),
+            1,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            FlightPhysics.turn(heading: 2, toward: 358, elapsed: 1),
+            359,
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(
+            FlightPhysics.turn(heading: 350, toward: 2, elapsed: 10),
+            2,
+            accuracy: 0.000_001
+        )
     }
 
     func testPositionChallenge() {

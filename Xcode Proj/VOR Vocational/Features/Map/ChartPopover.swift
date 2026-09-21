@@ -82,9 +82,9 @@ private struct ChartPopoverContent: View {
                 .toggleStyle(.checkbox)
             Toggle("Radials", isOn: $showRadials)
                 .toggleStyle(.checkbox)
-            Toggle("Sightseeing regions", isOn: $showSightseeingRegions)
-                .toggleStyle(.checkbox)
             Toggle("Sightseeing names", isOn: $showSightseeingRegionNames)
+                .toggleStyle(.checkbox)
+            Toggle("Sightseeing regions", isOn: $showSightseeingRegions)
                 .toggleStyle(.checkbox)
 
             HStack(spacing: 8) {

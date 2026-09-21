@@ -80,7 +80,8 @@ struct MapView<ChartOverlay: View>: View {
 
                 CockpitPanel(mapWidth: mapWidth, onSwap: { session.swapNAVReceivers() }) {
                     if configuration.showsHeadingPresentation {
-                        PlaneControlView(heading: $session.heading,
+                        PlaneControlView(heading: session.heading,
+                                         selectedHeading: $session.selectedHeading,
                                          speedKnots: $session.speedKnots,
                                          isFlying: $session.isFlying,
                                          timeMultiplier: $session.timeMultiplier,
@@ -227,6 +228,7 @@ struct MapView<ChartOverlay: View>: View {
             if configuration.allowsAircraftSimulation {
                 FlightTimerView(normalizedAircraftPosition: $session.normalizedAircraftPosition,
                                 heading: $session.heading,
+                                selectedHeading: $session.selectedHeading,
                                 speedKnots: $session.speedKnots,
                                 isFlying: $session.isFlying,
                                 timeMultiplier: $session.timeMultiplier,
@@ -449,6 +451,7 @@ private struct CockpitPanel<Heading: View, Nav1: View, Nav2: View>: View {
 private struct FlightTimerView: View {
     @Binding var normalizedAircraftPosition: CGPoint
     @Binding var heading: Double
+    @Binding var selectedHeading: Double
     @Binding var speedKnots: Double
     @Binding var isFlying: Bool
     @Binding var timeMultiplier: Double
@@ -483,6 +486,12 @@ private struct FlightTimerView: View {
     private func advancePlane(by elapsed: TimeInterval) {
         let simulatedElapsed = elapsed * timeMultiplier
         elapsedSimulatedSeconds += simulatedElapsed
+
+        heading = FlightPhysics.turn(
+            heading: heading,
+            toward: selectedHeading,
+            elapsed: simulatedElapsed
+        )
 
         let currentPosition = FlatMap.point(for: normalizedAircraftPosition, in: mapBounds)
         let localPosition = CGPoint(x: currentPosition.x - mapBounds.minX,

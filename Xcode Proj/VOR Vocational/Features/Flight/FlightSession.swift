@@ -55,7 +55,11 @@ struct NAVReceiver: Equatable {
 @Observable
 final class FlightSession {
     var normalizedAircraftPosition: CGPoint
+    /// The aircraft's current, physical direction of travel.
     var heading: Double = 0
+    /// The heading selected with the heading knob. The aircraft turns toward
+    /// this target at the simulation's bounded turn rate.
+    var selectedHeading: Double = 0
     var speedKnots: Double = 260
     var isFlying = false
     var timeMultiplier: Double = 1

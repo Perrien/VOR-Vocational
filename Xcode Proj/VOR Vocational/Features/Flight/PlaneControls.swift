@@ -21,7 +21,10 @@ enum ControlPalette {
 /// its lower-left corner — and, when enabled, a lower row of evenly spaced,
 /// same-height airspeed, playback, and Play/Pause controls.
 struct PlaneControlView: View {
-    @Binding var heading: Double
+    /// The aircraft's current heading. The indicator and map update from this
+    /// value as the plane turns toward the selected heading.
+    let heading: Double
+    @Binding var selectedHeading: Double
     @Binding var speedKnots: Double
     @Binding var isFlying: Bool
 
@@ -56,8 +59,12 @@ struct PlaneControlView: View {
             VStack(spacing: contentSpacing) {
                 if diameter > 0 {
                     ZStack {
-                        HeadingIndicator(heading: heading, diameter: diameter)
-                        RotaryKnob(value: $heading, diameter: knobDiameter)
+                        HeadingIndicator(heading: heading,
+                                         selectedHeading: selectedHeading,
+                                         diameter: diameter)
+                        RotaryKnob(value: $selectedHeading,
+                                   diameter: knobDiameter,
+                                   allowsRotationalDrag: false)
                             .offset(x: -radius + knobInset, y: radius - knobInset)
                     }
                 }
@@ -172,6 +179,7 @@ struct PlaneControlView: View {
 /// fixed plane silhouette and a top index showing the current heading.
 struct HeadingIndicator: View {
     let heading: Double
+    let selectedHeading: Double
     var diameter: CGFloat = 150
 
     private var radius: CGFloat { diameter / 2 }
@@ -188,12 +196,25 @@ struct HeadingIndicator: View {
             CompassCard(radius: radius)
                 .rotationEffect(.degrees(-heading))
 
+            // The selected-heading bug moves immediately with the knob while
+            // the compass card continues rotating gradually with the aircraft.
+            Image(systemName: "arrowtriangle.down.fill")
+                .foregroundStyle(ControlPalette.cockpitAccent)
+                .font(.system(size: 11 * scale))
+                .offset(y: -radius + 13 * scale)
+                .rotationEffect(.degrees(selectedHeading - heading))
+
             // Fixed plane silhouette, always pointing "up" (toward the index).
             // The airplane symbol points east by default, so −90° faces it up.
             Image(systemName: "airplane")
-                .font(.system(size: 50 * scale))
+                // Preserve generous room above the aircraft for the exact
+                // heading readout at the large cockpit-dial size.
+                .font(.system(size: 30 * scale))
                 .foregroundStyle(.white)
                 .rotationEffect(.degrees(-90))
+
+            headingReadout
+            selectedHeadingReadout
 
             // Fixed heading index at the top (the lubber line).
             Image(systemName: "arrowtriangle.down.fill")
@@ -202,6 +223,31 @@ struct HeadingIndicator: View {
                 .offset(y: -radius + 10 * scale)
         }
         .frame(width: diameter, height: diameter)
+    }
+
+    private var headingReadout: some View {
+        Text("HDG \(formattedHeading(heading))°")
+            .font(.system(size: 9 * scale, weight: .bold, design: .monospaced))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 4 * scale)
+            .padding(.vertical, 2 * scale)
+            .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 3 * scale))
+            .offset(y: -radius * 0.4)
+    }
+
+    private var selectedHeadingReadout: some View {
+        Text("SEL \(formattedHeading(selectedHeading))°")
+            .font(.system(size: 9 * scale, weight: .semibold, design: .monospaced))
+            .foregroundStyle(ControlPalette.cockpitAccent)
+            .padding(.horizontal, 4 * scale)
+            .padding(.vertical, 2 * scale)
+            .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 3 * scale))
+            .offset(y: radius * 0.4)
+    }
+
+    private func formattedHeading(_ value: Double) -> String {
+        let rounded = Int(value.rounded()) % 360
+        return String(format: "%03d", rounded < 0 ? rounded + 360 : rounded)
     }
 }
 
@@ -212,6 +258,10 @@ struct HeadingIndicator: View {
 struct RotaryKnob: View {
     @Binding var value: Double
     var diameter: CGFloat = 40
+    /// The heading knob is scroll-only, which prevents a fast pointer drag
+    /// from selecting an unintended heading. Other rotary controls retain
+    /// their direct physical-dial gesture.
+    var allowsRotationalDrag = true
 
     @State private var lastDragAngle: Double?
     @State private var accumulatedDelta: Double = 0
@@ -219,7 +269,7 @@ struct RotaryKnob: View {
     private var radius: CGFloat { diameter / 2 }
 
     var body: some View {
-        ZStack {
+        let knob = ZStack {
             Circle()
                 .fill(Color.gray.opacity(0.35))
                 .overlay(Circle().stroke(ControlPalette.cockpitFieldBorder, lineWidth: 1))
@@ -244,12 +294,17 @@ struct RotaryKnob: View {
         }
         .frame(width: diameter, height: diameter)
         .contentShape(Circle())
-        .gesture(rotationDrag)
         .background(
             ScrollWheelReader { deltaY in
                 accumulate(Double(deltaY))
             }
         )
+
+        if allowsRotationalDrag {
+            knob.gesture(rotationDrag)
+        } else {
+            knob
+        }
     }
 
     private var rotationDrag: some Gesture {
