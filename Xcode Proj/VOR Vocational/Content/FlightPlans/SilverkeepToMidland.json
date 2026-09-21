@@ -1,0 +1,25 @@
+{
+  "id": "silverkeep-to-midland",
+  "name": "Silverkeep to Midland",
+  "origin": { "kind": "airport", "icao": "GPSK" },
+  "waypoints": [
+    { "kind": "vor", "stationID": "mossbarrow" },
+    {
+      "kind": "intersection",
+      "radials": [
+        { "stationID": "mossbarrow", "radialDegrees": 154 },
+        { "stationID": "marrowfield", "radialDegrees": 286 }
+      ]
+    },
+    { "kind": "vor", "stationID": "marrowfield" },
+    {
+      "kind": "intersection",
+      "radials": [
+        { "stationID": "marrowfield", "radialDegrees": 78 },
+        { "stationID": "elmstead", "radialDegrees": 353 }
+      ]
+    }
+  ],
+  "destination": { "kind": "airport", "icao": "GPMC" },
+  "terminalReference": { "stationID": "elmstead", "radialDegrees": 353 }
+}

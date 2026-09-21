@@ -472,6 +472,48 @@ final class NavigationCoreTests: XCTestCase {
         }
     }
 
+    func testSilverkeepToMidlandPlanLoadsAndResolves() throws {
+        let plan = try FlightPlanCatalog.load(named: "SilverkeepToMidland")
+        let resolved = try FlightPlanResolver.resolve(
+            plan,
+            airports: Airport.myosia,
+            stations: VORStation.myosia,
+            mapWidthNM: 500,
+            mapHeightNM: 500 / (1748.0 / 1254.0),
+            cruiseSpeedKnots: 260
+        )
+
+        XCTAssertEqual(plan.id, "silverkeep-to-midland")
+        XCTAssertEqual(resolved.points.count, 6)
+        XCTAssertEqual(resolved.legs.count, 5)
+        assertPoint(resolved.points[2].normalizedPosition,
+                    equals: CGPoint(x: 0.4211612647, y: 0.6804788797),
+                    accuracy: 0.000_001)
+        assertPoint(resolved.points[4].normalizedPosition,
+                    equals: CGPoint(x: 0.5064072813, y: 0.6892128515),
+                    accuracy: 0.000_001)
+        XCTAssertEqual(resolved.totalDistanceNM, 99.18027355, accuracy: 0.000_001)
+        XCTAssertEqual(resolved.stillAirEstimate.durationSeconds, 1_373.2653260866, accuracy: 0.000_001)
+
+        assertGuidance(resolved.legs[0].guidance,
+                       ident: "MSB", frequencyMHz: 117.15, obsDegrees: 103, flag: .to)
+        assertGuidance(resolved.legs[1].guidance,
+                       ident: "MSB", frequencyMHz: 117.15, obsDegrees: 154, flag: .from)
+        assertGuidance(resolved.legs[2].guidance,
+                       ident: "MFD", frequencyMHz: 116.25, obsDegrees: 106, flag: .to)
+        assertGuidance(resolved.legs[3].guidance,
+                       ident: "MFD", frequencyMHz: 116.25, obsDegrees: 78, flag: .from)
+        XCTAssertNil(resolved.legs[4].guidance)
+        assertGuidance(resolved.terminalReference,
+                       ident: "ELS", frequencyMHz: 112, obsDegrees: 353, flag: .from)
+    }
+
+    func testFlightPlanCatalogNamesMissingBundleResource() {
+        XCTAssertThrowsError(try FlightPlanCatalog.load(named: "NoSuchPlan")) { error in
+            XCTAssertEqual(error as? FlightPlanCatalog.CatalogError, .resourceNotFound("NoSuchPlan"))
+        }
+    }
+
     private func makeStation(identifier: String, x: Double = 0.5, y: Double = 0.5) -> VORStation {
         VORStation(
             id: identifier,
@@ -509,10 +551,30 @@ final class NavigationCoreTests: XCTestCase {
     private func assertPoint(
         _ point: CGPoint,
         equals expected: CGPoint,
+        accuracy: CGFloat = 0.000_001,
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        XCTAssertEqual(point.x, expected.x, accuracy: 0.000_001, file: file, line: line)
-        XCTAssertEqual(point.y, expected.y, accuracy: 0.000_001, file: file, line: line)
+        XCTAssertEqual(point.x, expected.x, accuracy: accuracy, file: file, line: line)
+        XCTAssertEqual(point.y, expected.y, accuracy: accuracy, file: file, line: line)
+    }
+
+    private func assertGuidance(
+        _ guidance: VORGuidance?,
+        ident: String,
+        frequencyMHz: Double,
+        obsDegrees: Int,
+        flag: VORGuidance.Flag,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard let guidance else {
+            XCTFail("Expected VOR guidance for \(ident)", file: file, line: line)
+            return
+        }
+        XCTAssertEqual(guidance.stationIdent, ident, file: file, line: line)
+        XCTAssertEqual(guidance.frequencyMHz, frequencyMHz, accuracy: 0.000_001, file: file, line: line)
+        XCTAssertEqual(guidance.obsDegrees, obsDegrees, file: file, line: line)
+        XCTAssertEqual(guidance.flag, flag, file: file, line: line)
     }
 }
