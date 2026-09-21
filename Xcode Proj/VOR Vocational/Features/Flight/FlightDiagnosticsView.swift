@@ -66,15 +66,19 @@ private struct FlightDiagnosticsContent: View {
 
     @ViewBuilder
     private func receiverRows(for receiver: NAVReceiver) -> some View {
-        let reading = VORNavigation.receiverReading(
-            frequencyHundredths: receiver.frequencyHundredths,
-            obs: receiver.obs,
-            normalizedAircraftPosition: session.normalizedAircraftPosition,
-            stations: stations,
-            mapWidthNM: FlatMap.widthNM,
-            mapHeightNM: FlatMap.heightNM,
-            cdiMax: session.cdiMax
-        )
+        let reading = if receiver.hasActiveFrequency {
+            VORNavigation.receiverReading(
+                frequencyHundredths: receiver.frequencyHundredths,
+                obs: receiver.obs,
+                normalizedAircraftPosition: session.normalizedAircraftPosition,
+                stations: stations,
+                mapWidthNM: FlatMap.widthNM,
+                mapHeightNM: FlatMap.heightNM,
+                cdiMax: session.cdiMax
+            )
+        } else {
+            ReceiverReading(station: nil, cdiReading: .off)
+        }
 
         LabeledContent("Frequency", value: receiver.frequencyLabel)
         LabeledContent("Ident", value: reading.station?.ident ?? "No reception")

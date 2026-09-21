@@ -7,21 +7,28 @@ struct NAVReceiver: Equatable {
     var wholeMHz: Int = 108
     var fineStep: Int = 0
     var obs: Int = 0
+    /// Whether this receiver currently has an active tuned frequency. A failed
+    /// out-of-range ident selection clears it, so stale reception cannot keep
+    /// driving the indicator.
+    var hasActiveFrequency = true
 
     var frequencyHundredths: Int {
         wholeMHz * 100 + fineStep * 5
     }
 
     var frequencyLabel: String {
-        String(format: "%.2f", Double(frequencyHundredths) / 100)
+        guard hasActiveFrequency else { return "---.--" }
+        return String(format: "%.2f", Double(frequencyHundredths) / 100)
     }
 
     mutating func adjustWhole(by amount: Int) {
         wholeMHz = min(max(wholeMHz + amount, 108), 117)
+        hasActiveFrequency = true
     }
 
     mutating func adjustFine(by amount: Int) {
         fineStep = (fineStep + amount % 20 + 20) % 20
+        hasActiveFrequency = true
     }
 
     mutating func adjustOBS(by amount: Int) {
@@ -33,6 +40,14 @@ struct NAVReceiver: Equatable {
     mutating func tune(toFrequencyHundredths frequencyHundredths: Int) {
         wholeMHz = frequencyHundredths / 100
         fineStep = (frequencyHundredths % 100) / 5
+        hasActiveFrequency = true
+    }
+
+    /// Clears the displayed and active frequency without replacing it with a
+    /// made-up channel. The last physical knob position is retained so a
+    /// subsequent adjustment can retune the receiver.
+    mutating func clearFrequency() {
+        hasActiveFrequency = false
     }
 }
 

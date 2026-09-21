@@ -335,7 +335,11 @@ struct MapView<ChartOverlay: View>: View {
     }
 
     private func receiverReading(for receiver: NAVReceiver) -> ReceiverReading {
-        VORNavigation.receiverReading(
+        guard receiver.hasActiveFrequency else {
+            return ReceiverReading(station: nil, cdiReading: .off)
+        }
+
+        return VORNavigation.receiverReading(
             frequencyHundredths: receiver.frequencyHundredths,
             obs: receiver.obs,
             normalizedAircraftPosition: receptionPosition ?? session.normalizedAircraftPosition,

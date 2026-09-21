@@ -300,8 +300,9 @@ struct RotaryKnob: View {
 ///
 /// Typing a station's ident (e.g. "CTR") tunes the receiver to that station's
 /// frequency and turns the frequency green, but only once that station is in
-/// range; an unmatched, partial, or out-of-range ident leaves the current
-/// frequency untouched and displayed in its normal color.
+/// range. A known but out-of-range ident clears the active frequency so a
+/// previous station cannot remain falsely connected; unmatched or partial
+/// input leaves the receiver alone.
 struct NavRadioView: View {
     let name: String
     @Binding var receiver: NAVReceiver
@@ -355,7 +356,7 @@ struct NavRadioView: View {
                         .foregroundStyle(ControlPalette.cockpitSecondaryText)
 
                     HStack(spacing: 0) {
-                        Spacer()
+                        Spacer(minLength: 0)
 
                         TextField("---", text: identTextBinding)
                             .textFieldStyle(.plain)
@@ -370,13 +371,22 @@ struct NavRadioView: View {
                                     .stroke(isValid ? ControlPalette.cockpitAccent.opacity(0.7) : ControlPalette.cockpitFieldBorder, lineWidth: 1)
                             )
 
-                        Spacer()
+                        Divider()
+                            .overlay(ControlPalette.cockpitDivider)
+                            .frame(height: 24)
+                            .padding(.horizontal, 8)
 
-                        Text(receiver.frequencyLabel)
-                            .font(.title3.monospacedDigit().weight(.semibold))
-                            .foregroundStyle(isValid ? ControlPalette.cockpitAccent : ControlPalette.cockpitText)
+                        HStack(spacing: 8) {
+                            Text("Freq: \(receiver.frequencyLabel)")
+                            Divider()
+                                .overlay(ControlPalette.cockpitDivider)
+                                .frame(height: 24)
+                            Text("OBS: \(String(format: "%03d", receiver.obs))°")
+                        }
+                        .font(.title3.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(isValid ? ControlPalette.cockpitAccent : ControlPalette.cockpitText)
 
-                        Spacer()
+                        Spacer(minLength: 0)
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -415,6 +425,8 @@ struct NavRadioView: View {
                 identText = String(newValue.uppercased().prefix(3))
                 if let station = matchedStation {
                     receiver.tune(toFrequencyHundredths: Int((station.frequency * 100).rounded()))
+                } else if VORNavigation.station(withIdent: identText, in: stations) != nil {
+                    receiver.clearFrequency()
                 }
             }
         )

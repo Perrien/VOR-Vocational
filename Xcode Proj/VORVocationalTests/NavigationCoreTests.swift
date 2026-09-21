@@ -105,6 +105,20 @@ final class NavigationCoreTests: XCTestCase {
         XCTAssertEqual(receiver.frequencyLabel, "116.80")
     }
 
+    func testNAVReceiverClearingFrequencyDisablesItsReadoutUntilRetuned() {
+        var receiver = NAVReceiver(wholeMHz: 116, fineStep: 16)
+
+        receiver.clearFrequency()
+
+        XCTAssertFalse(receiver.hasActiveFrequency)
+        XCTAssertEqual(receiver.frequencyLabel, "---.--")
+
+        receiver.tune(toFrequencyHundredths: 11450)
+
+        XCTAssertTrue(receiver.hasActiveFrequency)
+        XCTAssertEqual(receiver.frequencyLabel, "114.50")
+    }
+
     func testStationLookupByFrequency() {
         let station = makeStation(identifier: "CTR")
         XCTAssertEqual(
