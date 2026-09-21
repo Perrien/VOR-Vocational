@@ -295,7 +295,7 @@ struct RotaryKnob: View {
         .frame(width: diameter, height: diameter)
         .contentShape(Circle())
         .background(
-            ScrollWheelReader { deltaY in
+            ScrollWheelReader { deltaY, _ in
                 accumulate(Double(deltaY))
             }
         )

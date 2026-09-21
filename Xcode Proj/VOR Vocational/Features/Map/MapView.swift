@@ -243,8 +243,8 @@ struct MapView<ChartOverlay: View>: View {
         .gesture(panGesture(mapSize: mapSize))
         .coordinateSpace(name: mapSpace)
         .background(
-            ScrollWheelReader { deltaY in
-                applyZoomDelta(deltaY, mapSize: mapSize)
+            ScrollWheelReader { deltaY, location in
+                applyZoomDelta(deltaY, anchoredAt: location, mapSize: mapSize)
             }
         )
     }
@@ -329,11 +329,22 @@ struct MapView<ChartOverlay: View>: View {
                       height: min(max(proposed.height, -maxY), maxY))
     }
 
-    /// Applies a scroll-wheel delta to the zoom, centered on the map. Positive
-    /// delta (scroll up) zooms in. Pan is re-clamped by `onChange(of: zoom)`.
-    private func applyZoomDelta(_ deltaY: CGFloat, mapSize: CGSize) {
+    /// Applies a scroll-wheel delta to the zoom, keeping the chart point under
+    /// the pointer fixed in place. Positive delta (scroll up) zooms in.
+    private func applyZoomDelta(_ deltaY: CGFloat, anchoredAt location: CGPoint, mapSize: CGSize) {
         let factor = 1 + deltaY * 0.08
-        session.zoom = min(max(session.zoom * factor, minZoom), maxZoom)
+        let oldZoom = session.zoom
+        let newZoom = min(max(oldZoom * factor, minZoom), maxZoom)
+        guard newZoom != oldZoom else { return }
+
+        let center = CGPoint(x: mapSize.width / 2, y: mapSize.height / 2)
+        let zoomRatio = newZoom / oldZoom
+        let anchoredPan = CGSize(
+            width: session.pan.width * zoomRatio + (location.x - center.x) * (1 - zoomRatio),
+            height: session.pan.height * zoomRatio + (location.y - center.y) * (1 - zoomRatio)
+        )
+        session.pan = clampedPan(anchoredPan, zoom: newZoom, mapSize: mapSize)
+        session.zoom = newZoom
     }
 
     private func receiverReading(for receiver: NAVReceiver) -> ReceiverReading {
@@ -514,8 +525,9 @@ private struct FlightTimerView: View {
 /// modifier for scroll-wheel input on a plain view, so we install a local event
 /// monitor and report the vertical delta when the pointer is over this view.
 struct ScrollWheelReader: NSViewRepresentable {
-    /// Called with the vertical scroll delta (positive = scroll up).
-    var onScroll: (CGFloat) -> Void
+    /// Called with the vertical scroll delta (positive = scroll up) and the
+    /// pointer position in this view's top-left-origin coordinate space.
+    var onScroll: (CGFloat, CGPoint) -> Void
 
     func makeNSView(context: Context) -> NSView {
         let view = MonitorView()
@@ -528,8 +540,10 @@ struct ScrollWheelReader: NSViewRepresentable {
     }
 
     final class MonitorView: NSView {
-        var onScroll: ((CGFloat) -> Void)?
+        var onScroll: ((CGFloat, CGPoint) -> Void)?
         private var monitor: Any?
+
+        override var isFlipped: Bool { true }
 
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
@@ -540,7 +554,7 @@ struct ScrollWheelReader: NSViewRepresentable {
                 let frame = self.convert(self.bounds, to: nil)
                 guard frame.contains(event.locationInWindow) else { return event }
                 let delta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY * 0.02 : event.deltaY
-                self.onScroll?(delta)
+                self.onScroll?(delta, self.convert(event.locationInWindow, from: nil))
                 return nil
             }
         }
