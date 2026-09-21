@@ -12,6 +12,7 @@ struct TransportMissionView: View {
 
     @State private var session: FlightSession
     @State private var progress: MissionFlightProgress
+    @State private var completion: MissionFlightCompletion?
     @Environment(FlightDiagnosticsStore.self) private var diagnosticsStore
 
     init(
@@ -49,7 +50,7 @@ struct TransportMissionView: View {
                 .padding(.leading, 16)
             }
             .overlay(alignment: .bottomTrailing) {
-                missionCard
+                flightCard
                     .padding(16)
             }
             .ignoresSafeArea()
@@ -123,6 +124,13 @@ struct TransportMissionView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.orange)
             }
+
+            Button(role: .destructive, action: completeFlight) {
+                Label("Flight Complete", systemImage: "flag.checkered")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.orange)
         }
         .padding(16)
         .frame(width: 310, alignment: .leading)
@@ -131,12 +139,98 @@ struct TransportMissionView: View {
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.primary.opacity(0.1)))
     }
 
+    private var resultCard: some View {
+        let completion = completion!
+
+        return VStack(alignment: .leading, spacing: 14) {
+            Text("Flight Complete")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(ControlPalette.primaryText)
+            Text("Silverkeep Strip → Midland Cityport")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ControlPalette.secondaryText)
+            Text("Your position was recorded when you marked the flight complete.")
+                .font(.caption)
+                .foregroundStyle(ControlPalette.secondaryText)
+
+            Divider()
+
+            resultMetric(title: "SIMULATED TIME", value: formatTime(completion.simulatedElapsedSeconds))
+            resultMetric(title: "DISTANCE FROM MIDLAND", value: String(format: "%.2f NM", completion.distanceFromDestinationNM))
+
+            Divider()
+
+            Button(action: flyAgain) {
+                Label("Fly Again", systemImage: "arrow.counterclockwise")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(ControlPalette.accent)
+
+            Button("Back to Missions", action: leaveForMissions)
+                .buttonStyle(.bordered)
+                .frame(maxWidth: .infinity)
+        }
+        .padding(16)
+        .frame(width: 310, alignment: .leading)
+        .background(Color(nsColor: .textBackgroundColor).opacity(0.96),
+                    in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.primary.opacity(0.1)))
+    }
+
+    @ViewBuilder
+    private var flightCard: some View {
+        if completion == nil {
+            missionCard
+        } else {
+            resultCard
+        }
+    }
+
+    private func resultMetric(title: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(ControlPalette.secondaryText)
+            Spacer()
+            Text(value)
+                .font(.subheadline.monospacedDigit().weight(.semibold))
+                .foregroundStyle(ControlPalette.primaryText)
+        }
+    }
+
     private var simulatedTimeLabel: String {
-        let totalSeconds = max(0, Int(session.elapsedSimulatedSeconds.rounded()))
+        formatTime(session.elapsedSimulatedSeconds)
+    }
+
+    private func formatTime(_ elapsedSeconds: TimeInterval) -> String {
+        let totalSeconds = max(0, Int(elapsedSeconds.rounded()))
         let hours = totalSeconds / 3_600
         let minutes = totalSeconds % 3_600 / 60
         let seconds = totalSeconds % 60
         return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+    }
+
+    private func completeFlight() {
+        session.isFlying = false
+        completion = MissionFlightCompletion(
+            resolvedPlan: resolvedPlan,
+            aircraftPosition: session.normalizedAircraftPosition,
+            simulatedElapsedSeconds: session.elapsedSimulatedSeconds,
+            mapWidthNM: FlatMap.widthNM,
+            mapHeightNM: FlatMap.heightNM
+        )
+    }
+
+    private func flyAgain() {
+        guard let origin = resolvedPlan.points.first else {
+            preconditionFailure("Transport mission needs a resolved origin.")
+        }
+        session.isFlying = false
+        session = FlightSession(normalizedAirportPosition: origin.normalizedPosition)
+        progress = MissionFlightProgress(instructionCount: briefing.steps.count)
+        completion = nil
+        diagnosticsStore.activeSession = session
     }
 
     private func leaveForBriefing() {
@@ -147,6 +241,11 @@ struct TransportMissionView: View {
     private func leaveForHome() {
         session.isFlying = false
         onHome()
+    }
+
+    private func leaveForMissions() {
+        session.isFlying = false
+        onMissions()
     }
 }
 
