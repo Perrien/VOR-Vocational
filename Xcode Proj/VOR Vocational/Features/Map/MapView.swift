@@ -72,6 +72,7 @@ struct MapView<ChartOverlay: View>: View {
                                     showRadials: $session.showRadials,
                                     showGrid: $session.showGrid,
                                     showSightseeingRegions: $session.showSightseeingRegions,
+                                    showSightseeingRegionNames: $session.showSightseeingRegionNames,
                                     gridSizeNM: $session.gridSizeNM)
                             .padding(.top, 40)
                             .padding(.trailing, 16)
@@ -115,6 +116,7 @@ struct MapView<ChartOverlay: View>: View {
             .onAppear {
                 session.pan = clampedPan(session.pan, zoom: session.zoom, mapSize: mapSize)
                 session.showAirports = configuration.showsAirportsByDefault
+                session.showSightseeingRegionNames = configuration.showsSightseeingRegionNamesByDefault
             }
         }
         .ignoresSafeArea()
@@ -195,18 +197,19 @@ struct MapView<ChartOverlay: View>: View {
                 }
             }
 
-            // Landmark names stay visible even when checkpoint tolerances are hidden.
-            ForEach(sightseeingRegions) { region in
-                Text(region.name)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 4)
-                    .background(.black.opacity(0.62), in: Capsule())
-                    .shadow(color: .black.opacity(0.7), radius: 2)
-                    .position(screenPoint(point(for: region.labelPosition, in: imageRect),
-                                          mapSize: mapSize))
-                    .allowsHitTesting(false)
+            if session.showSightseeingRegionNames {
+                ForEach(sightseeingRegions) { region in
+                    Text(region.name)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                        .background(.black.opacity(0.62), in: Capsule())
+                        .shadow(color: .black.opacity(0.7), radius: 2)
+                        .position(screenPoint(point(for: region.labelPosition, in: imageRect),
+                                              mapSize: mapSize))
+                        .allowsHitTesting(false)
+                }
             }
 
             PlaneIcon(heading: session.heading)

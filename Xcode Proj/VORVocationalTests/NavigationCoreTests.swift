@@ -189,6 +189,7 @@ final class NavigationCoreTests: XCTestCase {
         XCTAssertTrue(session.showRadials)
         XCTAssertFalse(session.showGrid)
         XCTAssertFalse(session.showSightseeingRegions)
+        XCTAssertTrue(session.showSightseeingRegionNames)
         XCTAssertEqual(session.gridSizeNM, 50)
     }
 
@@ -197,6 +198,7 @@ final class NavigationCoreTests: XCTestCase {
             .freeFlight,
             FlightSurfaceConfiguration(
                 showsAirportsByDefault: true,
+                showsSightseeingRegionNamesByDefault: true,
                 allowsAircraftSimulation: true,
                 showsHeadingPresentation: true,
                 showsFlightControls: true
@@ -206,6 +208,7 @@ final class NavigationCoreTests: XCTestCase {
             .positionChallenge,
             FlightSurfaceConfiguration(
                 showsAirportsByDefault: false,
+                showsSightseeingRegionNamesByDefault: false,
                 allowsAircraftSimulation: false,
                 showsHeadingPresentation: true,
                 showsFlightControls: false

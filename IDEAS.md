@@ -6,9 +6,10 @@ Each entry is one individually addressable idea. Refer to its ID—for example, 
 
 ### I-002 — First supplied mission: Silverkeep to Midland
 
-**Status:** Ready to plan
+**Status:** Planned
 **Type:** Initiative
-**Next action:** `a-plan I-002` for V0.3a
+**Plan:** `Plans/I-002-V0.3a-Flight-Plan-Foundation.md`
+**Next action:** Build the V0.3a flight-plan foundation.
 
 **What it is:** Create the first complete authored flight: Home → Missions → briefing/planner → flight → arrival result. The route is Silverkeep Strip to Midland Cityport, with VOR legs and two radial-intersection fixes.
 

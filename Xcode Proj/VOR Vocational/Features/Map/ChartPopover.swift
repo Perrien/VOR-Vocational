@@ -10,6 +10,7 @@ struct ChartButton: View {
     @Binding var showRadials: Bool
     @Binding var showGrid: Bool
     @Binding var showSightseeingRegions: Bool
+    @Binding var showSightseeingRegionNames: Bool
     @Binding var gridSizeNM: Double
 
     @State private var isPresented = false
@@ -29,6 +30,7 @@ struct ChartButton: View {
                 showRadials: $showRadials,
                 showGrid: $showGrid,
                 showSightseeingRegions: $showSightseeingRegions,
+                showSightseeingRegionNames: $showSightseeingRegionNames,
                 gridSizeNM: $gridSizeNM
             )
         }
@@ -46,6 +48,7 @@ private struct ChartPopoverContent: View {
     @Binding var showRadials: Bool
     @Binding var showGrid: Bool
     @Binding var showSightseeingRegions: Bool
+    @Binding var showSightseeingRegionNames: Bool
     @Binding var gridSizeNM: Double
 
     @State private var gridSizeText: String = ""
@@ -80,6 +83,8 @@ private struct ChartPopoverContent: View {
             Toggle("Radials", isOn: $showRadials)
                 .toggleStyle(.checkbox)
             Toggle("Sightseeing regions", isOn: $showSightseeingRegions)
+                .toggleStyle(.checkbox)
+            Toggle("Sightseeing names", isOn: $showSightseeingRegionNames)
                 .toggleStyle(.checkbox)
 
             HStack(spacing: 8) {
