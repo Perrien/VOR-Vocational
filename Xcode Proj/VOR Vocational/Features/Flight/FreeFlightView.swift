@@ -20,7 +20,7 @@ struct FreeFlightView: View {
     }
 
     var body: some View {
-        MapView(session: session)
+        MapView(session: session, configuration: .freeFlight)
             .overlay(alignment: .topLeading) {
                 // Extra top clearance keeps the control clear of the window's
                 // title bar, matching ChartButton's top-trailing treatment.

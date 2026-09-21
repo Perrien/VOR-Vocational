@@ -4,6 +4,7 @@ import AppKit
 /// A flat map with VOR stations and a draggable plane, plus NAV radios below it.
 struct MapView<ChartOverlay: View>: View {
     @Bindable var session: FlightSession
+    private let configuration: FlightSurfaceConfiguration
 
     /// Chart-space content positioned by a caller outside this view (e.g.
     /// Position Challenge's hidden-target reveal), given the same fitted
@@ -19,9 +20,11 @@ struct MapView<ChartOverlay: View>: View {
     private let receptionPosition: CGPoint?
 
     init(session: FlightSession,
+         configuration: FlightSurfaceConfiguration = .freeFlight,
          receptionPosition: CGPoint? = nil,
          @ViewBuilder chartOverlay: @escaping (CGRect) -> ChartOverlay = { _ in EmptyView() }) {
         _session = Bindable(session)
+        self.configuration = configuration
         self.receptionPosition = receptionPosition
         self.chartOverlay = chartOverlay
     }
@@ -75,11 +78,13 @@ struct MapView<ChartOverlay: View>: View {
                     }
 
                 CockpitPanel(mapWidth: mapWidth, onSwap: { session.swapNAVReceivers() }) {
-                    PlaneControlView(heading: $session.heading,
-                                     speedKnots: $session.speedKnots,
-                                     isFlying: $session.isFlying,
-                                     timeMultiplier: $session.timeMultiplier,
-                                     isChallengeActive: false)
+                    if configuration.showsHeadingPresentation {
+                        PlaneControlView(heading: $session.heading,
+                                         speedKnots: $session.speedKnots,
+                                         isFlying: $session.isFlying,
+                                         timeMultiplier: $session.timeMultiplier,
+                                         showsFlightControls: configuration.showsFlightControls)
+                    }
                 } nav1: {
                     NavRadioView(
                         name: "NAV1",
@@ -109,6 +114,7 @@ struct MapView<ChartOverlay: View>: View {
             }
             .onAppear {
                 session.pan = clampedPan(session.pan, zoom: session.zoom, mapSize: mapSize)
+                session.showAirports = configuration.showsAirportsByDefault
             }
         }
         .ignoresSafeArea()
@@ -208,13 +214,15 @@ struct MapView<ChartOverlay: View>: View {
                 // The plane's own drag wins over panning when the drag starts on it.
                 .highPriorityGesture(planeDrag(planePos: planePos, imageRect: imageRect))
 
-            FlightTimerView(normalizedAircraftPosition: $session.normalizedAircraftPosition,
-                            heading: $session.heading,
-                            speedKnots: $session.speedKnots,
-                            isFlying: $session.isFlying,
-                            timeMultiplier: $session.timeMultiplier,
-                            mapBounds: imageRect,
-                            pixelsPerNM: pixelsPerNM(in: imageRect))
+            if configuration.allowsAircraftSimulation {
+                FlightTimerView(normalizedAircraftPosition: $session.normalizedAircraftPosition,
+                                heading: $session.heading,
+                                speedKnots: $session.speedKnots,
+                                isFlying: $session.isFlying,
+                                timeMultiplier: $session.timeMultiplier,
+                                mapBounds: imageRect,
+                                pixelsPerNM: pixelsPerNM(in: imageRect))
+            }
         }
         .frame(width: mapSize.width, height: mapSize.height)
         .clipped()

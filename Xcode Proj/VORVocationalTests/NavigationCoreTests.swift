@@ -192,6 +192,27 @@ final class NavigationCoreTests: XCTestCase {
         XCTAssertEqual(session.gridSizeNM, 50)
     }
 
+    func testFlightSurfaceConfigurationPresets() {
+        XCTAssertEqual(
+            .freeFlight,
+            FlightSurfaceConfiguration(
+                showsAirportsByDefault: true,
+                allowsAircraftSimulation: true,
+                showsHeadingPresentation: true,
+                showsFlightControls: true
+            )
+        )
+        XCTAssertEqual(
+            .positionChallenge,
+            FlightSurfaceConfiguration(
+                showsAirportsByDefault: false,
+                allowsAircraftSimulation: false,
+                showsHeadingPresentation: true,
+                showsFlightControls: false
+            )
+        )
+    }
+
     func testNAVReceiverSwap() {
         let session = FlightSession(normalizedAirportPosition: .zero)
         session.nav1 = NAVReceiver(wholeMHz: 116, fineStep: 16, obs: 45)

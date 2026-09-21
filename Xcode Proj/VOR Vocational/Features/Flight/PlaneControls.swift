@@ -18,8 +18,8 @@ enum ControlPalette {
 
 // MARK: - Plane Controls
 /// The heading bay: a heading indicator — with the Heading Knob tucked into
-/// its lower-left corner — above a lower row of evenly spaced, same-height
-/// airspeed, playback, and Play/Pause controls.
+/// its lower-left corner — and, when enabled, a lower row of evenly spaced,
+/// same-height airspeed, playback, and Play/Pause controls.
 struct PlaneControlView: View {
     @Binding var heading: Double
     @Binding var speedKnots: Double
@@ -30,9 +30,9 @@ struct PlaneControlView: View {
     // barely move the plane in real time otherwise.
     @Binding var timeMultiplier: Double
 
-    // Disables the Play/Pause button so an active position challenge's
-    // guess placement can't be disturbed by an animated flight.
-    var isChallengeActive: Bool = false
+    /// Keeps the heading indicator at the same size as the NAV instruments
+    /// even when a mode omits the flight-control row.
+    var showsFlightControls = true
 
     private static let timeMultiplierOptions: [Double] = [1, 5, 10, 30]
 
@@ -62,73 +62,11 @@ struct PlaneControlView: View {
                     }
                 }
 
-                HStack(alignment: .bottom, spacing: 18) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("SPD")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(ControlPalette.cockpitSecondaryText)
-                        HStack(spacing: 6) {
-                            TextField("120", text: $speedText)
-                                .textFieldStyle(.plain)
-                                .multilineTextAlignment(.center)
-                                .font(.callout.monospacedDigit().weight(.medium))
-                                .foregroundStyle(ControlPalette.cockpitText)
-                                .padding(.horizontal, 6)
-                                .frame(width: 52, height: controlHeight)
-                                .background(ControlPalette.cockpitFieldBackground, in: RoundedRectangle(cornerRadius: 6))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(ControlPalette.cockpitFieldBorder, lineWidth: 1)
-                                )
-                            Text("KTS")
-                                .font(.caption2.monospacedDigit())
-                                .foregroundStyle(ControlPalette.cockpitSecondaryText)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("PLAYBACK")
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundStyle(ControlPalette.cockpitSecondaryText)
-                        Picker("Playback speed", selection: $timeMultiplier) {
-                            ForEach(Self.timeMultiplierOptions, id: \.self) { multiplier in
-                                Text("\(Int(multiplier))×")
-                                    .foregroundStyle(ControlPalette.cockpitText)
-                                    .tag(multiplier)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .labelsHidden()
-                        .tint(ControlPalette.cockpitText)
-                        .padding(.horizontal, 6)
-                        .frame(width: 96, height: controlHeight)
-                        .background(ControlPalette.cockpitFieldBackground, in: RoundedRectangle(cornerRadius: 6))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(ControlPalette.cockpitFieldBorder, lineWidth: 1)
-                        )
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Button {
-                        isFlying.toggle()
-                    } label: {
-                        Label(isFlying ? "Pause" : "Play",
-                              systemImage: isFlying ? "pause.fill" : "play.fill")
-                            .font(.callout.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: controlHeight)
-                            .background(isFlying ? Color.orange : Color.green, in: RoundedRectangle(cornerRadius: 6))
-                            .opacity(isChallengeActive ? 0.5 : 1)
-                    }
-                    .buttonStyle(.plain)
-                    .keyboardShortcut(.space, modifiers: [])
-                    .disabled(isChallengeActive)
-                    .frame(maxWidth: .infinity)
+                if showsFlightControls {
+                    flightControlsRow
+                } else {
+                    Color.clear.frame(height: lowerRowHeight)
                 }
-                .frame(height: lowerRowHeight)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -147,6 +85,74 @@ struct PlaneControlView: View {
         .onSubmit {
             speedText = formattedSpeed(speedKnots)
         }
+    }
+
+    private var flightControlsRow: some View {
+        HStack(alignment: .bottom, spacing: 18) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("SPD")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(ControlPalette.cockpitSecondaryText)
+                HStack(spacing: 6) {
+                    TextField("120", text: $speedText)
+                        .textFieldStyle(.plain)
+                        .multilineTextAlignment(.center)
+                        .font(.callout.monospacedDigit().weight(.medium))
+                        .foregroundStyle(ControlPalette.cockpitText)
+                        .padding(.horizontal, 6)
+                        .frame(width: 52, height: controlHeight)
+                        .background(ControlPalette.cockpitFieldBackground, in: RoundedRectangle(cornerRadius: 6))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(ControlPalette.cockpitFieldBorder, lineWidth: 1)
+                        )
+                    Text("KTS")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(ControlPalette.cockpitSecondaryText)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("PLAYBACK")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(ControlPalette.cockpitSecondaryText)
+                Picker("Playback speed", selection: $timeMultiplier) {
+                    ForEach(Self.timeMultiplierOptions, id: \.self) { multiplier in
+                        Text("\(Int(multiplier))×")
+                            .foregroundStyle(ControlPalette.cockpitText)
+                            .tag(multiplier)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .tint(ControlPalette.cockpitText)
+                .padding(.horizontal, 6)
+                .frame(width: 96, height: controlHeight)
+                .background(ControlPalette.cockpitFieldBackground, in: RoundedRectangle(cornerRadius: 6))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(ControlPalette.cockpitFieldBorder, lineWidth: 1)
+                )
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button {
+                isFlying.toggle()
+            } label: {
+                Label(isFlying ? "Pause" : "Play",
+                      systemImage: isFlying ? "pause.fill" : "play.fill")
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: controlHeight)
+                    .background(isFlying ? Color.orange : Color.green, in: RoundedRectangle(cornerRadius: 6))
+            }
+            .buttonStyle(.plain)
+            .keyboardShortcut(.space, modifiers: [])
+            .frame(maxWidth: .infinity)
+        }
+        .frame(height: lowerRowHeight)
     }
 
     /// The dial fills the width, bounded by the height left over above the
