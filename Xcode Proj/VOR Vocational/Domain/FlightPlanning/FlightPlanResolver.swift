@@ -4,7 +4,7 @@ import Foundation
 /// Converts authored flight-plan references into validated chart geometry and
 /// semantic NAV guidance. It has no Bundle or SwiftUI dependency so callers
 /// can validate plans before presenting them.
-enum FlightPlanResolver {
+nonisolated enum FlightPlanResolver {
     enum ValidationError: Error, Equatable, LocalizedError {
         case invalidMapDimensions
         case invalidCruiseSpeed

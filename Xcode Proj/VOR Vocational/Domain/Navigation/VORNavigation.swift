@@ -4,7 +4,7 @@ import Foundation
 /// Pure VOR navigation math: no SwiftUI, no view geometry. Callers resolve
 /// screen/map positions first (see `MapView`'s `point(for:in:)` and
 /// `pixelsPerNM(in:)`) and pass plain points and distances in here.
-enum VORNavigation {
+nonisolated enum VORNavigation {
     /// Wraps an angle to the range −180…180.
     static func normalize180(_ angle: Double) -> Double {
         var result = angle.truncatingRemainder(dividingBy: 360)

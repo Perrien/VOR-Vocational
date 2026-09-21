@@ -2,14 +2,14 @@ import Foundation
 import CoreGraphics
 
 /// The kind of navaid a station is.
-enum VORType: String, Decodable {
+nonisolated enum VORType: String, Decodable {
     case vor = "VOR"
     case vorDME = "VOR_DME"
     case vortac = "VORTAC"
 }
 
 /// The standard service volume assigned to a VOR station.
-enum VORServiceVolume: String, Decodable, CaseIterable, Hashable {
+nonisolated enum VORServiceVolume: String, Decodable, CaseIterable, Hashable {
     case high = "H"
     case low = "L"
     case terminal = "T"
@@ -34,9 +34,9 @@ enum VORServiceVolume: String, Decodable, CaseIterable, Hashable {
 }
 
 /// A single VOR ground station on the map, decoded from `VORStations.json`.
-struct VORStation: Identifiable, Decodable {
+nonisolated struct VORStation: Identifiable, Decodable {
     /// A map coordinate, each component in 0...1 relative to the map image.
-    struct Location: Decodable {
+    nonisolated struct Location: Decodable {
         let x: Double
         let y: Double
     }
@@ -95,12 +95,12 @@ struct VORStation: Identifiable, Decodable {
     }
 }
 
-enum AirportSize: String, Decodable {
+nonisolated enum AirportSize: String, Decodable {
     case large, small
 }
 
 /// An airport on the map, decoded from `Airports.json`.
-struct Airport: Identifiable, Decodable {
+nonisolated struct Airport: Identifiable, Decodable {
     /// Unique ID.
     let id = UUID()
     /// Airport full name.
@@ -216,8 +216,8 @@ struct SightseeingRegion: Identifiable, Decodable {
 }
 
 /// The state a CDI displays: which way the needle deflects and the TO/FROM flag.
-struct CDIReading {
-    enum Flag { case to, from, off }
+nonisolated struct CDIReading {
+    nonisolated enum Flag { case to, from, off }
 
     /// Needle deflection, −1 (full left) … +1 (full right). 0 = on course.
     let deflection: Double
@@ -227,7 +227,7 @@ struct CDIReading {
 }
 
 /// The station and CDI result currently available to a frequency-tuned receiver.
-struct ReceiverReading {
+nonisolated struct ReceiverReading {
     let station: VORStation?
     let cdiReading: CDIReading
 }

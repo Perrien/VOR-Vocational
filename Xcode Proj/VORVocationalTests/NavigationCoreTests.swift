@@ -171,6 +171,7 @@ final class NavigationCoreTests: XCTestCase {
         assertReading(outOfRange.cdiReading, flag: .off, deflection: 0)
     }
 
+    @MainActor
     func testFreshFlightSessionDefaults() {
         let position = CGPoint(x: 0.5067, y: 0.6889)
         let session = FlightSession(normalizedAirportPosition: position)
@@ -194,6 +195,7 @@ final class NavigationCoreTests: XCTestCase {
         XCTAssertEqual(session.gridSizeNM, 50)
     }
 
+    @MainActor
     func testFlightSurfaceConfigurationPresets() {
         XCTAssertEqual(
             .freeFlight,
@@ -217,6 +219,7 @@ final class NavigationCoreTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testNAVReceiverSwap() {
         let session = FlightSession(normalizedAirportPosition: .zero)
         session.nav1 = NAVReceiver(wholeMHz: 116, fineStep: 16, obs: 45)

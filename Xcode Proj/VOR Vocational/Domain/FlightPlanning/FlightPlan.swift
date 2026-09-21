@@ -2,7 +2,7 @@ import Foundation
 
 /// Authored, bundle-friendly route input. It contains stable world references
 /// and a terminal navigation reference, never calculated route measurements.
-struct FlightPlan: Codable, Equatable {
+nonisolated struct FlightPlan: Codable, Equatable {
     let id: String
     let name: String
     let origin: PlanPoint
@@ -18,14 +18,14 @@ struct FlightPlan: Codable, Equatable {
 }
 
 /// One VOR radial, always measured outbound FROM the named station.
-struct RadialReference: Codable, Equatable {
+nonisolated struct RadialReference: Codable, Equatable {
     let stationID: String
     let radialDegrees: Double
 }
 
 /// One route point authored as a stable airport/VOR reference or two VOR
 /// radials. The custom coding keeps the JSON readable and explicit.
-enum PlanPoint: Codable, Equatable {
+nonisolated enum PlanPoint: Codable, Equatable {
     case airport(icao: String)
     case vor(stationID: String)
     case intersection(radials: [RadialReference])
@@ -73,7 +73,7 @@ enum PlanPoint: Codable, Equatable {
 
 /// A resolved point with a normalized chart coordinate and a label for future
 /// plan and chart presentation.
-struct ResolvedPlanPoint: Equatable {
+nonisolated struct ResolvedPlanPoint: Equatable {
     enum Kind: Equatable {
         case airport
         case vor
@@ -87,7 +87,7 @@ struct ResolvedPlanPoint: Equatable {
 }
 
 /// The intended indication for one VOR-navigation action.
-struct VORGuidance: Equatable {
+nonisolated struct VORGuidance: Equatable {
     enum Flag: String, Equatable {
         case to = "TO"
         case from = "FROM"
@@ -103,7 +103,7 @@ struct VORGuidance: Equatable {
 /// One calculated line between consecutive plan points. A terminal airport
 /// segment may intentionally have no guidance; its terminal reference is kept
 /// separately on `ResolvedFlightPlan`.
-struct FlightPlanLeg: Equatable {
+nonisolated struct FlightPlanLeg: Equatable {
     let start: ResolvedPlanPoint
     let end: ResolvedPlanPoint
     let distanceNM: Double
@@ -111,14 +111,14 @@ struct FlightPlanLeg: Equatable {
 }
 
 /// Still-air time for a resolved route at a caller-supplied planning speed.
-struct StillAirEstimate: Equatable {
+nonisolated struct StillAirEstimate: Equatable {
     let cruiseSpeedKnots: Double
     let durationSeconds: TimeInterval
 }
 
 /// Complete calculated output used by V0.3b's plan display and V0.3c's
 /// mission wrapper.
-struct ResolvedFlightPlan: Equatable {
+nonisolated struct ResolvedFlightPlan: Equatable {
     let plan: FlightPlan
     let points: [ResolvedPlanPoint]
     let legs: [FlightPlanLeg]
