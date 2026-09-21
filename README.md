@@ -4,7 +4,7 @@ VOR Navigator is a macOS teaching game for learning real VOR navigation in the f
 
 ## Current state
 
-The V0.2 foundation is in place. The app has a Home screen, a working Free Flight mode, and a working Position Challenge under Practice. Learn and Missions have their own screens but are not functional lessons or flights yet.
+The V0.3 foundation is in place. The app has a Home screen, a working Free Flight mode, a working Position Challenge under Practice, and a preflight Transport briefing under Missions. Learn is still a catalog rather than a lesson, and Transport cannot be flown until the next mission-loop slice.
 
 What can be tried today:
 
@@ -12,10 +12,11 @@ What can be tried today:
 - Use two frequency-tuned NAV receivers with OBS, CDI display, TO/FROM indications, station range handling, and a NAV1/NAV2 swap.
 - Pan and zoom the chart; show airports, VORs, selected-station range rings, radials, a grid, and sightseeing markers.
 - Start a Position Challenge, use the instruments to infer a hidden location, drag the aircraft marker to the guess, and see the error in nautical miles. Its stationary guess marker cannot be moved by flight simulation.
+- Open Missions → Transport → Briefing to inspect the supplied Silverkeep-to-Midland route, its 99.2-NM still-air plan, and five read-only VOR instructions.
 
 ## How to run it
 
-Open [VOR Vocational.xcodeproj](<Xcode Proj/VOR Vocational.xcodeproj>) in Xcode, choose the shared **VOR Vocational** scheme and a macOS run destination, then Run. Start at Home; Free Flight is ready to use, and Practice contains Position Challenge.
+Open [VOR Vocational.xcodeproj](<Xcode Proj/VOR Vocational.xcodeproj>) in Xcode, choose the shared **VOR Vocational** scheme and a macOS run destination, then Run. Start at Home; Free Flight and Position Challenge are ready to use, and Missions contains the Transport briefing.
 
 ## How the app is arranged
 
@@ -26,7 +27,8 @@ Open [VOR Vocational.xcodeproj](<Xcode Proj/VOR Vocational.xcodeproj>) in Xcode,
 | `Features/Flight/` | A flight session, reusable surface configurations, the Free Flight wrapper, cockpit controls, and diagnostics. |
 | `Features/Map/` | Draws and operates the chart: camera, aircraft marker, chart layers, receiver readings, and cockpit composition. |
 | `Features/Practice/` | The Position Challenge flow and its result panel. |
-| `Features/Learn/`, `Features/Missions/` | Present the not-yet-implemented mode lists. |
+| `Features/Learn/` | Presents the not-yet-implemented lesson list. |
+| `Features/Missions/` | Presents the Mission catalog and the static Transport plan briefing. |
 | `Domain/Navigation/` | Pure VOR calculations: station lookup, CDI behavior, TO/FROM logic, and distance-related navigation math. |
 | `Domain/Simulation/` | Flight movement and Position Challenge target generation/scoring. |
 | `Domain/Models.swift` | Data models for VORs, airports, regions, and receiver readings. |
