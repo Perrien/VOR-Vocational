@@ -6,6 +6,7 @@ struct TransportBriefingView: View {
     var onMissions: () -> Void
     var onHome: () -> Void
 
+    @State private var isShowingTransportFlight = false
     private let content: TransportBriefingContent?
     private let loadError: String?
 
@@ -23,19 +24,29 @@ struct TransportBriefingView: View {
     }
 
     var body: some View {
-        Group {
-            if let content {
-                briefing(content)
-            } else {
-                unavailableBriefing
+        if isShowingTransportFlight, let content {
+            TransportMissionView(
+                resolvedPlan: content.resolvedPlan,
+                briefing: content.briefing,
+                onBriefing: { isShowingTransportFlight = false },
+                onMissions: onMissions,
+                onHome: onHome
+            )
+        } else {
+            Group {
+                if let content {
+                    briefing(content)
+                } else {
+                    unavailableBriefing
+                }
             }
+            .overlay(alignment: .topLeading) {
+                HomeControl(action: onHome)
+                    .padding(.top, 40)
+                    .padding(.leading, 16)
+            }
+            .ignoresSafeArea()
         }
-        .overlay(alignment: .topLeading) {
-            HomeControl(action: onHome)
-                .padding(.top, 40)
-                .padding(.leading, 16)
-        }
-        .ignoresSafeArea()
     }
 
     private func briefing(_ content: TransportBriefingContent) -> some View {
@@ -44,7 +55,9 @@ struct TransportBriefingView: View {
                 routeChart(points: content.resolvedPlan.points)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                FlightPlanPanel(briefing: content.briefing, onMissions: onMissions)
+                FlightPlanPanel(briefing: content.briefing,
+                                onMissions: onMissions,
+                                onStart: { isShowingTransportFlight = true })
                     .frame(width: min(max(340, geometry.size.width * 0.34), 430))
             }
             .background(FlatMap.oceanColor)
@@ -112,6 +125,7 @@ private struct TransportBriefingContent {
 private struct FlightPlanPanel: View {
     let briefing: FlightPlanBriefing
     let onMissions: () -> Void
+    let onStart: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -142,10 +156,13 @@ private struct FlightPlanPanel: View {
                 }
             }
 
-            Text("Briefing only — mission flight is coming in V0.3c.")
-                .font(.caption)
-                .foregroundStyle(ControlPalette.secondaryText)
-                .padding(.top, 14)
+            Button(action: onStart) {
+                Label("Fly Transport", systemImage: "airplane.departure")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(ControlPalette.accent)
+            .padding(.top, 14)
         }
         .padding(24)
         .background(Color(nsColor: .textBackgroundColor).opacity(0.97))

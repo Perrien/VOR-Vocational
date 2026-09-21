@@ -617,18 +617,56 @@ final class NavigationCoreTests: XCTestCase {
         XCTAssertEqual(fiftyNMWest.distanceFromDestinationNM, 50, accuracy: 0.000_001)
     }
 
+    func testIndependentlyTunedReceiversResolveOwnStations() {
+        let mossbarrow = makeStation(identifier: "MSB", frequency: 117.15, x: 0.4, y: 0.62)
+        let marrowfield = makeStation(identifier: "MFD", frequency: 116.25, x: 0.47, y: 0.7)
+        var nav1 = NAVReceiver()
+        var nav2 = NAVReceiver()
+        nav1.tune(toFrequencyHundredths: 11_715)
+        nav2.tune(toFrequencyHundredths: 11_625)
+
+        let nav1Reading = VORNavigation.receiverReading(
+            frequencyHundredths: nav1.frequencyHundredths,
+            obs: nav1.obs,
+            normalizedAircraftPosition: CGPoint(x: 0.43, y: 0.66),
+            stations: [mossbarrow, marrowfield],
+            mapWidthNM: FlatMap.widthNM,
+            mapHeightNM: FlatMap.heightNM,
+            cdiMax: 10
+        )
+        let nav2Reading = VORNavigation.receiverReading(
+            frequencyHundredths: nav2.frequencyHundredths,
+            obs: nav2.obs,
+            normalizedAircraftPosition: CGPoint(x: 0.43, y: 0.66),
+            stations: [mossbarrow, marrowfield],
+            mapWidthNM: FlatMap.widthNM,
+            mapHeightNM: FlatMap.heightNM,
+            cdiMax: 10
+        )
+
+        XCTAssertEqual(nav1.frequencyLabel, "117.15")
+        XCTAssertEqual(nav1Reading.station?.ident, "MSB")
+        XCTAssertEqual(nav2.frequencyLabel, "116.25")
+        XCTAssertEqual(nav2Reading.station?.ident, "MFD")
+        XCTAssertNotEqual(nav1Reading.station?.relativePosition,
+                          nav2Reading.station?.relativePosition)
+    }
+
     func testFlightPlanCatalogNamesMissingBundleResource() {
         XCTAssertThrowsError(try FlightPlanCatalog.load(named: "NoSuchPlan")) { error in
             XCTAssertEqual(error as? FlightPlanCatalog.CatalogError, .resourceNotFound("NoSuchPlan"))
         }
     }
 
-    private func makeStation(identifier: String, x: Double = 0.5, y: Double = 0.5) -> VORStation {
+    private func makeStation(identifier: String,
+                             frequency: Double = 116.8,
+                             x: Double = 0.5,
+                             y: Double = 0.5) -> VORStation {
         VORStation(
             id: identifier,
             name: "Test Station",
             identifier: identifier,
-            frequency: 116.8,
+            frequency: frequency,
             location: VORStation.Location(x: x, y: y),
             type: .vor,
             serviceVolume: .high,

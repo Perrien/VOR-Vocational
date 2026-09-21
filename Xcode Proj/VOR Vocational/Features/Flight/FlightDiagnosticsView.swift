@@ -1,7 +1,7 @@
 #if DEBUG
 import SwiftUI
 
-/// Debug-only window showing the active Free Flight session's simulation
+/// Debug-only window showing the active live-flight session's simulation
 /// truth — real position and receiver/signal data that never appears in
 /// normal play. `cdiMax` is its only editable control. Reads the shared
 /// `FlightDiagnosticsStore` and calls `VORNavigation.receiverReading`
@@ -15,7 +15,7 @@ struct FlightDiagnosticsView: View {
         if let session = diagnosticsStore.activeSession {
             FlightDiagnosticsContent(session: session, stations: stations)
         } else {
-            Text("No Free Flight session is active.")
+            Text("No live flight session is active.")
                 .foregroundStyle(.secondary)
                 .padding()
                 .frame(minWidth: 320, minHeight: 200)
@@ -29,6 +29,11 @@ private struct FlightDiagnosticsContent: View {
 
     var body: some View {
         Form {
+            Section("Flight") {
+                LabeledContent("Heading", value: String(format: "%.0f°", session.heading))
+                LabeledContent("Simulated time", value: String(format: "%.2f s", session.elapsedSimulatedSeconds))
+            }
+
             Section("Position") {
                 LabeledContent(
                     "Normalized",
@@ -36,6 +41,11 @@ private struct FlightDiagnosticsContent: View {
                                   session.normalizedAircraftPosition.x,
                                   session.normalizedAircraftPosition.y)
                 )
+            }
+
+            Section("True position and heading") {
+                FlightDiagnosticsMap(session: session)
+                    .frame(height: 250)
             }
 
             Section("NAV1") {
@@ -51,7 +61,7 @@ private struct FlightDiagnosticsContent: View {
             }
         }
         .padding()
-        .frame(minWidth: 320, minHeight: 420)
+        .frame(minWidth: 420, minHeight: 700)
     }
 
     @ViewBuilder
@@ -81,6 +91,29 @@ private struct FlightDiagnosticsContent: View {
         case .off: flagLabel = "NAV flag"
         }
         return String(format: "%.2f (%@)", reading.cdiReading.deflection, flagLabel)
+    }
+}
+
+/// A diagnostic-only truth view. It projects the session's actual normalized
+/// position through the same chart conversion as `MapView`, but exposes no
+/// gesture and is never added to the player-facing mission chart.
+private struct FlightDiagnosticsMap: View {
+    @Bindable var session: FlightSession
+
+    var body: some View {
+        GeometryReader { geometry in
+            let imageRect = FlatMap.fittedRect(in: geometry.size)
+            ZStack {
+                FlatMap(imageRect: imageRect)
+                PlaneIcon(heading: session.heading)
+                    .position(FlatMap.point(for: session.normalizedAircraftPosition,
+                                             in: imageRect))
+                    .allowsHitTesting(false)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped()
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 #endif

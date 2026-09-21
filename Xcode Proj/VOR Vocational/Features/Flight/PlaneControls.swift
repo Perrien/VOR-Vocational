@@ -329,7 +329,13 @@ struct NavRadioView: View {
                                                  mapHeightNM: mapHeightNM)
         return distance <= station.rangeNM ? station : nil
     }
-    private var isValid: Bool { matchedStation != nil }
+    /// A green ident means the receiver is actually tuned to the in-range
+    /// station shown in its own field. This avoids presenting stale typed text
+    /// as a received station if SwiftUI is reconciling radio controls.
+    private var isValid: Bool {
+        guard let station = matchedStation else { return false }
+        return receiver.frequencyHundredths == Int((station.frequency * 100).rounded())
+    }
 
     private let contentSpacing: CGFloat = 10
     private let lowerRowHeight: CGFloat = 58

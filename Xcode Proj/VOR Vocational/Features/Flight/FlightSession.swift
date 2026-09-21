@@ -72,7 +72,7 @@ final class FlightSession {
     }
 }
 
-/// A Debug-only scene registry for the currently visible Free Flight session.
+/// A Debug-only scene registry for the currently visible live-flight session.
 @Observable
 final class FlightDiagnosticsStore {
     var activeSession: FlightSession?

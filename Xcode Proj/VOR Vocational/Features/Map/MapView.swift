@@ -96,6 +96,10 @@ struct MapView<ChartOverlay: View>: View {
                         mapWidthNM: FlatMap.widthNM,
                         mapHeightNM: FlatMap.heightNM
                     )
+                    // Both radios have local ident-entry state. Give each a
+                    // stable identity so SwiftUI never reuses one receiver's
+                    // pending text while rendering the other receiver.
+                    .id("nav1-radio")
                 } nav2: {
                     NavRadioView(
                         name: "NAV2",
@@ -106,6 +110,7 @@ struct MapView<ChartOverlay: View>: View {
                         mapWidthNM: FlatMap.widthNM,
                         mapHeightNM: FlatMap.heightNM
                     )
+                    .id("nav2-radio")
                 }
             }
             // Re-clamp the pan whenever the zoom changes (e.g. via scroll) so
