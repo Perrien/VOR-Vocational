@@ -1,5 +1,6 @@
 import XCTest
 import CoreGraphics
+import Foundation
 @testable import VOR_Vocational
 
 final class NavigationCoreTests: XCTestCase {
@@ -319,18 +320,171 @@ final class NavigationCoreTests: XCTestCase {
         XCTAssertEqual(VORServiceVolume.terminal.rangeNM, 25)
     }
 
-    private func makeStation(identifier: String) -> VORStation {
+    func testFlightPlanDecodesTaggedPointsAndTerminalReference() throws {
+        let data = Data("""
+        {
+          "id": "example",
+          "name": "Example plan",
+          "origin": { "kind": "airport", "icao": "GPEX" },
+          "waypoints": [
+            { "kind": "vor", "stationID": "example-vor" },
+            {
+              "kind": "intersection",
+              "radials": [
+                { "stationID": "example-vor", "radialDegrees": 90 },
+                { "stationID": "other-vor", "radialDegrees": 180 }
+              ]
+            }
+          ],
+          "destination": { "kind": "airport", "icao": "GPDX" },
+          "terminalReference": { "stationID": "other-vor", "radialDegrees": 180 }
+        }
+        """.utf8)
+
+        let plan = try JSONDecoder().decode(FlightPlan.self, from: data)
+
+        XCTAssertEqual(plan.id, "example")
+        XCTAssertEqual(plan.origin, .airport(icao: "GPEX"))
+        XCTAssertEqual(plan.waypoints[0], .vor(stationID: "example-vor"))
+        XCTAssertEqual(
+            plan.waypoints[1],
+            .intersection(radials: [
+                RadialReference(stationID: "example-vor", radialDegrees: 90),
+                RadialReference(stationID: "other-vor", radialDegrees: 180),
+            ])
+        )
+        XCTAssertEqual(plan.terminalReference, RadialReference(stationID: "other-vor", radialDegrees: 180))
+    }
+
+    func testFlightPlanResolverDerivesAirportToVORGuidance() throws {
+        let airport = makeAirport(icao: "GPEX", x: 0.2, y: 0.5)
+        let station = makeStation(identifier: "EAS", x: 0.4, y: 0.5)
+        let plan = FlightPlan(
+            id: "eastbound",
+            name: "Eastbound",
+            origin: .airport(icao: "GPEX"),
+            waypoints: [],
+            destination: .vor(stationID: "EAS"),
+            terminalReference: nil
+        )
+
+        let resolved = try FlightPlanResolver.resolve(
+            plan,
+            airports: [airport],
+            stations: [station],
+            mapWidthNM: 500,
+            mapHeightNM: 500,
+            cruiseSpeedKnots: 100
+        )
+
+        XCTAssertEqual(resolved.legs.count, 1)
+        XCTAssertEqual(resolved.legs[0].distanceNM, 100, accuracy: 0.000_001)
+        XCTAssertEqual(resolved.legs[0].guidance?.stationIdent, "EAS")
+        XCTAssertEqual(resolved.legs[0].guidance?.obsDegrees, 90)
+        XCTAssertEqual(resolved.legs[0].guidance?.flag, .to)
+        XCTAssertEqual(resolved.stillAirEstimate.durationSeconds, 3_600, accuracy: 0.000_001)
+    }
+
+    func testFlightPlanResolverDerivesVORIntersectionGuidance() throws {
+        let first = makeStation(identifier: "ONE", x: 0.2, y: 0.2)
+        let second = makeStation(identifier: "TWO", x: 0.6, y: 0.6)
+        let intersection = PlanPoint.intersection(radials: [
+            RadialReference(stationID: "ONE", radialDegrees: 90),
+            RadialReference(stationID: "TWO", radialDegrees: 0),
+        ])
+        let plan = FlightPlan(
+            id: "intersection",
+            name: "Intersection",
+            origin: .vor(stationID: "ONE"),
+            waypoints: [intersection],
+            destination: .vor(stationID: "TWO"),
+            terminalReference: nil
+        )
+
+        let resolved = try FlightPlanResolver.resolve(
+            plan,
+            airports: [],
+            stations: [first, second],
+            mapWidthNM: 200,
+            mapHeightNM: 200,
+            cruiseSpeedKnots: 100
+        )
+
+        assertPoint(resolved.points[1].normalizedPosition, equals: CGPoint(x: 0.6, y: 0.2))
+        XCTAssertEqual(resolved.legs[0].guidance?.stationIdent, "ONE")
+        XCTAssertEqual(resolved.legs[0].guidance?.obsDegrees, 90)
+        XCTAssertEqual(resolved.legs[0].guidance?.flag, .from)
+        XCTAssertEqual(resolved.legs[1].guidance?.stationIdent, "TWO")
+        XCTAssertEqual(resolved.legs[1].guidance?.obsDegrees, 180)
+        XCTAssertEqual(resolved.legs[1].guidance?.flag, .to)
+    }
+
+    func testFlightPlanResolverRejectsInvalidAuthoring() {
+        let station = makeStation(identifier: "ONE", x: 0.2, y: 0.2)
+        let invalidIntersection = FlightPlan(
+            id: "invalid",
+            name: "Invalid",
+            origin: .vor(stationID: "ONE"),
+            waypoints: [.intersection(radials: [
+                RadialReference(stationID: "ONE", radialDegrees: 90),
+                RadialReference(stationID: "ONE", radialDegrees: 180),
+            ])],
+            destination: .vor(stationID: "ONE"),
+            terminalReference: nil
+        )
+
+        XCTAssertThrowsError(
+            try FlightPlanResolver.resolve(
+                invalidIntersection,
+                airports: [],
+                stations: [station],
+                mapWidthNM: 500,
+                mapHeightNM: 500,
+                cruiseSpeedKnots: 100
+            )
+        ) { error in
+            XCTAssertEqual(error as? FlightPlanResolver.ValidationError,
+                           .duplicateIntersectionStations("ONE"))
+        }
+
+        let unknownAirport = FlightPlan(
+            id: "unknown-airport",
+            name: "Unknown airport",
+            origin: .airport(icao: "GPXX"),
+            waypoints: [],
+            destination: .vor(stationID: "ONE"),
+            terminalReference: nil
+        )
+        XCTAssertThrowsError(
+            try FlightPlanResolver.resolve(
+                unknownAirport,
+                airports: [],
+                stations: [station],
+                mapWidthNM: 500,
+                mapHeightNM: 500,
+                cruiseSpeedKnots: 100
+            )
+        ) { error in
+            XCTAssertEqual(error as? FlightPlanResolver.ValidationError, .unknownAirport("GPXX"))
+        }
+    }
+
+    private func makeStation(identifier: String, x: Double = 0.5, y: Double = 0.5) -> VORStation {
         VORStation(
             id: identifier,
             name: "Test Station",
             identifier: identifier,
             frequency: 116.8,
-            location: VORStation.Location(x: 0.5, y: 0.5),
+            location: VORStation.Location(x: x, y: y),
             type: .vor,
             serviceVolume: .high,
             elevationFT: 100,
             dme: false
         )
+    }
+
+    private func makeAirport(icao: String, x: Double, y: Double) -> Airport {
+        Airport(name: "Test Airport", icao: icao, size: .small, x: x, y: y)
     }
 
     private func assertReading(
