@@ -300,6 +300,71 @@ struct PositionChallengeOverlay: View {
     }
 }
 
+/// Static geometry for a preflight route briefing. Unlike `MapView`'s chart
+/// layers, this contains no session, aircraft, or live radio state.
+struct FlightPlanRouteOverlay: View {
+    let points: [ResolvedPlanPoint]
+    let imageRect: CGRect
+
+    var body: some View {
+        ZStack {
+            Canvas { context, _ in
+                guard let first = points.first else { return }
+
+                var route = Path()
+                route.move(to: FlatMap.point(for: first.normalizedPosition, in: imageRect))
+                for point in points.dropFirst() {
+                    route.addLine(to: FlatMap.point(for: point.normalizedPosition, in: imageRect))
+                }
+                context.stroke(route,
+                               with: .color(.orange.opacity(0.92)),
+                               style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+            }
+
+            ForEach(Array(points.enumerated()), id: \.offset) { index, point in
+                FlightPlanRoutePointMarker(label: label(for: point, index: index),
+                                            isEndpoint: index == 0 || index == points.count - 1)
+                    .position(FlatMap.point(for: point.normalizedPosition, in: imageRect))
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func label(for point: ResolvedPlanPoint, index: Int) -> String {
+        if index == 0 { return "Start" }
+        if index == points.count - 1 { return point.name }
+        if point.kind == .intersection {
+            let fixNumber = points.prefix(index + 1).filter { $0.kind == .intersection }.count
+            return "Fix \(fixNumber)"
+        }
+        return point.name
+    }
+}
+
+private struct FlightPlanRoutePointMarker: View {
+    let label: String
+    let isEndpoint: Bool
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(isEndpoint ? Color.orange : Color.white)
+                .frame(width: isEndpoint ? 14 : 11, height: isEndpoint ? 14 : 11)
+                .overlay(Circle().stroke(.black.opacity(0.65), lineWidth: 1))
+                .shadow(color: .black.opacity(0.45), radius: 2)
+
+            Text(label)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(.black.opacity(0.7), in: Capsule())
+                .fixedSize()
+                .offset(y: -19)
+        }
+    }
+}
+
 /// A VOR station marker with optional details labelled beneath it.
 struct VORStationView: View {
     let station: VORStation
