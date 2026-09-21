@@ -2,13 +2,13 @@
 
 Each entry is one individually addressable idea. Refer to its ID—for example, “plan `I-002`,” “explore `I-005`,” or “delete `I-006`.” IDs never change or get reused. The status sections make the list easy to scan; they do not turn a collection of ideas into a project history.
 
-## Ready to plan
+## Ready to close
 
 ### I-002 — First supplied mission: Silverkeep to Midland
 
-**Status:** Active — V0.3a–V0.3b complete
+**Status:** Ready to close — V0.3a–V0.3c complete
 **Type:** Initiative
-**Next action:** Plan V0.3c: launch the supplied plan into a mission flight, let the player mark Flight Complete, and report simulated time plus distance from Midland.
+**Next action:** Owner decision: close/remove I-002 now that the first supplied mission loop is complete, or retain it as a completed reference. I-003 separately owns mission scoring and debrief.
 
 **What it is:** Create the first complete authored flight: Home → Missions → briefing/planner → flight → arrival result. The route is Silverkeep Strip to Midland Cityport, with VOR legs and two radial-intersection fixes.
 
@@ -18,9 +18,9 @@ Each entry is one individually addressable idea. Refer to its ID—for example, 
 
 1. **V0.3a — Flight-plan foundation (complete):** a bundled, validated Silverkeep-to-Midland plan with resolved route geometry, distances, still-air estimate, and readable NAV instructions.
 2. **V0.3b — Plan preview (complete):** Transport now presents the supplied route on a static chart and in a read-only Flight Plan briefing panel.
-3. **V0.3c — Mission loop:** hand the plan into a flight, identify the active leg, allow arrival marking, and show simulated time plus distance from Midland.
+3. **V0.3c — Mission loop (complete):** the briefing launches an instrument-led flight with hidden true chart position, manual instruction progress, player-selected Flight Complete, and unscored simulated time plus distance from Midland.
 
-**Open questions:** The first plan should decide the smallest data model and the most useful observable way to inspect its calculations. `Design/Documents/FlightPlanning.md` and `Design/Documents/FlightPlanFormat.md` are background reference, not active plans.
+**Open questions:** None for the first mission loop. `Design/Documents/FlightPlanning.md` and `Design/Documents/FlightPlanFormat.md` are background reference, not active plans; later scoring and debrief decisions belong to I-003.
 
 ## Needs exploration
 
