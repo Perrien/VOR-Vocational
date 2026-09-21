@@ -6,10 +6,9 @@ Each entry is one individually addressable idea. Refer to its ID—for example, 
 
 ### I-002 — First supplied mission: Silverkeep to Midland
 
-**Status:** Planned
+**Status:** Planned — V0.3a complete
 **Type:** Initiative
-**Plan:** `Plans/I-002-V0.3a-Flight-Plan-Foundation.md`
-**Next action:** Build the V0.3a flight-plan foundation.
+**Next action:** Plan V0.3b: a read-only plan preview on the chart and in the Flight Plan panel.
 
 **What it is:** Create the first complete authored flight: Home → Missions → briefing/planner → flight → arrival result. The route is Silverkeep Strip to Midland Cityport, with VOR legs and two radial-intersection fixes.
 
@@ -17,7 +16,7 @@ Each entry is one individually addressable idea. Refer to its ID—for example, 
 
 **Likely landmarks:**
 
-1. **V0.3a — Flight-plan foundation:** a small, testable model for origins, destinations, VOR/airport/intersection points, route distances, still-air estimate, and readable NAV instructions.
+1. **V0.3a — Flight-plan foundation (complete):** a bundled, validated Silverkeep-to-Midland plan with resolved route geometry, distances, still-air estimate, and readable NAV instructions.
 2. **V0.3b — Plan preview:** show the supplied plan on the chart and in a read-only Flight Plan panel.
 3. **V0.3c — Mission loop:** hand the plan into a flight, identify the active leg, allow arrival marking, and show simulated time plus distance from Midland.
 
