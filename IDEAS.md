@@ -1,26 +1,6 @@
 # Ideas and next work
 
-Each entry is one individually addressable idea. Refer to its ID—for example, “plan `I-002`,” “explore `I-005`,” or “delete `I-006`.” IDs never change or get reused. The status sections make the list easy to scan; they do not turn a collection of ideas into a project history.
-
-## Ready to close
-
-### I-002 — First supplied mission: Silverkeep to Midland
-
-**Status:** Ready to close — V0.3a–V0.3c complete
-**Type:** Initiative
-**Next action:** Owner decision: close/remove I-002 now that the first supplied mission loop is complete, or retain it as a completed reference. I-003 separately owns mission scoring and debrief.
-
-**What it is:** Create the first complete authored flight: Home → Missions → briefing/planner → flight → arrival result. The route is Silverkeep Strip to Midland Cityport, with VOR legs and two radial-intersection fixes.
-
-**Already decided:** Reuse the existing cockpit and Myosia data rather than replacing them. V0.3 excludes wind, route scoring, a full debrief, user-authored plans, iPad support, and expanded flight simulation. Position Challenge established `FlightSurfaceConfiguration`, so this plan should give the mission its explicit chart-aid and cockpit-control choices when its rules are defined.
-
-**Likely landmarks:**
-
-1. **V0.3a — Flight-plan foundation (complete):** a bundled, validated Silverkeep-to-Midland plan with resolved route geometry, distances, still-air estimate, and readable NAV instructions.
-2. **V0.3b — Plan preview (complete):** Transport now presents the supplied route on a static chart and in a read-only Flight Plan briefing panel.
-3. **V0.3c — Mission loop (complete):** the briefing launches an instrument-led flight with hidden true chart position, manual instruction progress, player-selected Flight Complete, and unscored simulated time plus distance from Midland.
-
-**Open questions:** None for the first mission loop. `Design/Documents/FlightPlanning.md` and `Design/Documents/FlightPlanFormat.md` are background reference, not active plans; later scoring and debrief decisions belong to I-003.
+Each entry is one individually addressable idea. Refer to its ID—for example, “explore `I-003`,” “explore `I-005`,” or “delete `I-006`.” IDs never change or get reused. The status sections make the list easy to scan; they do not turn a collection of ideas into a project history.
 
 ## Needs exploration
 
