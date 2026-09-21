@@ -2,7 +2,7 @@
 
 ## Status and goal
 
-**Status:** Ready to build. This is the next focused slice after V0.2.
+**Status:** Complete. Implemented after V0.2.
 
 **Goal:** Let a mode declare which chart aids and cockpit controls support its
 learning or mission purpose, without turning the reusable `MapView` into a
@@ -82,18 +82,18 @@ are enough evidence for the future API.
 
 ### 1. Establish the configuration seam
 
-- [ ] Create `FlightSurfaceConfiguration` with the minimal focused policy
+- [x] Create `FlightSurfaceConfiguration` with the minimal focused policy
   values and named `.freeFlight` / `.positionChallenge` presets.
-- [ ] Refactor `PlaneControlView` so the heading indicator/knob remains
+- [x] Refactor `PlaneControlView` so the heading indicator/knob remains
   available when the flight-control row is omitted. Avoid duplicating dial
   geometry or its heading binding.
-- [ ] Update `MapView` to receive and honor the configuration without any
+- [x] Update `MapView` to receive and honor the configuration without any
   knowledge of mode names. Use the configuration's airport default when the
   surface starts, while retaining the normal Chart toggle afterward.
-- [ ] Keep Free Flight's airports, chart controls, timer, speed field,
+- [x] Keep Free Flight's airports, chart controls, timer, speed field,
   playback picker, and Play/Pause behaviour visually and functionally
   unchanged.
-- [ ] Add pure preset tests and run the existing navigation/simulation tests.
+- [x] Add pure preset tests and run the existing navigation/simulation tests.
 
 **Checkpoint — reusable surface refactor:** Run the app in Free Flight. Toggle
 the familiar chart aids, tune both NAV radios, change heading/speed/playback,
@@ -106,17 +106,17 @@ Suggested commit message: `Refactor flight surface around mode configuration`
 
 ### 2. Make Position Challenge the first consumer
 
-- [ ] Pass `.positionChallenge` from `PositionChallengeView`.
-- [ ] In `start()`, set `session.isFlying = false` before placing the new guess
+- [x] Pass `.positionChallenge` from `PositionChallengeView`.
+- [x] In `start()`, set `session.isFlying = false` before placing the new guess
   marker and target.
-- [ ] Verify that Position Challenge starts with airports hidden, and that the
+- [x] Verify that Position Challenge starts with airports hidden, and that the
   normal Chart-panel Airports toggle can still show or hide them afterward.
-- [ ] Verify that its cockpit retains the heading indicator/knob and both NAV
+- [x] Verify that its cockpit retains the heading indicator/knob and both NAV
   radios/OBS controls, while speed, playback, and Play/Pause are absent.
-- [ ] Verify that starting a challenge while a session is already flying leaves
+- [x] Verify that starting a challenge while a session is already flying leaves
   the guess marker stationary; changing heading or pressing Space cannot start
   simulated movement during the challenge.
-- [ ] Verify that tuning and centering two in-range VORs, dragging a guess,
+- [x] Verify that tuning and centering two in-range VORs, dragging a guess,
   and checking it still produces a correct error/reveal. Start a new challenge
   and repeat once to confirm reset behaviour.
 
@@ -129,14 +129,14 @@ Suggested commit message: `Configure Position Challenge flight surface`
 
 ### 3. Close out the planning record after the owner accepts the feature
 
-- [ ] Update `IDEAS.md` so it no longer presents the fixed movement bug as
+- [x] Update `IDEAS.md` so it no longer presents the fixed movement bug as
   active work; retain a concise note that Position Challenge established the
   reusable configuration seam and state the next mission-related need only if
   it is still current.
-- [ ] Update `README.md` only if its current-state or arrangement description
+- [x] Update `README.md` only if its current-state or arrangement description
   is no longer accurate (including correcting the currently inaccurate “CDI or
   HSI display” wording if touched for this work).
-- [ ] Move this plan to `Plans/Archived/` once implementation is accepted and
+- [x] Move this plan to `Plans/Archived/` once implementation is accepted and
   the records reflect current state. Do not create a historical log elsewhere.
 
 ## Acceptance criteria

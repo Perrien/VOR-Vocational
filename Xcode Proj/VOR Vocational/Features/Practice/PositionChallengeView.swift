@@ -28,7 +28,9 @@ struct PositionChallengeView: View {
     private let stations: [VORStation] = VORStation.myosia
 
     var body: some View {
-        MapView(session: session, receptionPosition: target) { imageRect in
+        MapView(session: session,
+                configuration: .positionChallenge,
+                receptionPosition: target) { imageRect in
             challengeOverlay(imageRect: imageRect)
         }
         .overlay(alignment: .topLeading) {
@@ -97,6 +99,10 @@ struct PositionChallengeView: View {
     /// Hides the target, resets the guess marker to the chart's center, and
     /// picks a fresh solvable target (also used for "New Challenge").
     private func start() {
+        // A session can be paused or flying before an exercise begins. The
+        // configuration also omits the timer, but clear stale state before
+        // assigning a new guess so it cannot be advanced during this reset.
+        session.isFlying = false
         session.normalizedAircraftPosition = CGPoint(x: 0.5, y: 0.5)
         let newTarget = PositionChallenge.randomTarget(stations: stations,
                                                          mapWidthNM: FlatMap.widthNM,
