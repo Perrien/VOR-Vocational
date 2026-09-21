@@ -508,6 +508,49 @@ final class NavigationCoreTests: XCTestCase {
                        ident: "ELS", frequencyMHz: 112, obsDegrees: 353, flag: .from)
     }
 
+    func testSilverkeepToMidlandBriefingSeparatesTerminalReference() throws {
+        let plan = try FlightPlanCatalog.load(named: "SilverkeepToMidland")
+        let resolved = try FlightPlanResolver.resolve(
+            plan,
+            airports: Airport.myosia,
+            stations: VORStation.myosia,
+            mapWidthNM: 500,
+            mapHeightNM: 500 / (1748.0 / 1254.0),
+            cruiseSpeedKnots: 260
+        )
+
+        let briefing = FlightPlanBriefing(resolvedPlan: resolved)
+
+        XCTAssertEqual(briefing.planName, "Silverkeep to Midland")
+        XCTAssertEqual(briefing.originName, "Silverkeep Strip")
+        XCTAssertEqual(briefing.destinationName, "Midland Cityport")
+        XCTAssertEqual(briefing.totalDistanceNM, 99.18027355, accuracy: 0.000_001)
+        XCTAssertEqual(briefing.stillAirEstimate.durationSeconds, 1_373.2653260866, accuracy: 0.000_001)
+        XCTAssertEqual(briefing.steps.map(\.kind), [.leg, .leg, .leg, .leg, .terminalReference])
+
+        XCTAssertEqual(briefing.steps[0].title, "Silverkeep Strip to Mossbarrow")
+        XCTAssertEqual(briefing.steps[0].distanceNM ?? .nan,
+                       resolved.legs[0].distanceNM,
+                       accuracy: 0.000_001)
+        assertGuidance(briefing.steps[0].guidance,
+                       ident: "MSB", frequencyMHz: 117.15, obsDegrees: 103, flag: .to)
+        XCTAssertEqual(briefing.steps[1].title, "Mossbarrow to VOR radial intersection")
+        assertGuidance(briefing.steps[1].guidance,
+                       ident: "MSB", frequencyMHz: 117.15, obsDegrees: 154, flag: .from)
+        XCTAssertEqual(briefing.steps[2].title, "VOR radial intersection to Marrowfield")
+        assertGuidance(briefing.steps[2].guidance,
+                       ident: "MFD", frequencyMHz: 116.25, obsDegrees: 106, flag: .to)
+        XCTAssertEqual(briefing.steps[3].title, "Marrowfield to VOR radial intersection")
+        assertGuidance(briefing.steps[3].guidance,
+                       ident: "MFD", frequencyMHz: 116.25, obsDegrees: 78, flag: .from)
+
+        let terminalStep = briefing.steps[4]
+        XCTAssertEqual(terminalStep.title, "Final position reference near Midland Cityport")
+        XCTAssertNil(terminalStep.distanceNM)
+        assertGuidance(terminalStep.guidance,
+                       ident: "ELS", frequencyMHz: 112, obsDegrees: 353, flag: .from)
+    }
+
     func testFlightPlanCatalogNamesMissingBundleResource() {
         XCTAssertThrowsError(try FlightPlanCatalog.load(named: "NoSuchPlan")) { error in
             XCTAssertEqual(error as? FlightPlanCatalog.CatalogError, .resourceNotFound("NoSuchPlan"))
