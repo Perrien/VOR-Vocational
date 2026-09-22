@@ -33,17 +33,19 @@ struct TransportBriefingView: View {
                 onHome: onHome
             )
         } else {
-            Group {
-                if let content {
-                    briefing(content)
-                } else {
-                    unavailableBriefing
+            GeometryReader { _ in
+                Group {
+                    if let content {
+                        briefing(content)
+                    } else {
+                        unavailableBriefing
+                    }
                 }
-            }
-            .overlay(alignment: .topLeading) {
-                HomeControl(action: onHome)
-                    .padding(.top, 40)
-                    .padding(.leading, 16)
+                .overlay(alignment: .topLeading) {
+                    HomeControl(action: onHome)
+                        .padding(.top, 40)
+                        .padding(.leading, 16)
+                }
             }
             .ignoresSafeArea()
         }

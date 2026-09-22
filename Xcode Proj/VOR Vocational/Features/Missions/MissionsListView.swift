@@ -17,14 +17,16 @@ struct MissionsListView: View {
     }
 
     private var catalog: some View {
-        ZStack {
-            backgroundMap
-            panel
-        }
-        .overlay(alignment: .topLeading) {
-            HomeControl(action: onHome)
-                .padding(.top, 40)
-                .padding(.leading, 16)
+        GeometryReader { _ in
+            ZStack {
+                backgroundMap
+                panel
+            }
+            .overlay(alignment: .topLeading) {
+                HomeControl(action: onHome)
+                    .padding(.top, 40)
+                    .padding(.leading, 16)
+            }
         }
         .ignoresSafeArea()
     }

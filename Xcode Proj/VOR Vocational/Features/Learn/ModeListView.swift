@@ -10,16 +10,18 @@ struct ModeListView: View {
     var onHome: () -> Void
 
     var body: some View {
-        ZStack {
-            backgroundMap
-            panel
-        }
-        .overlay(alignment: .topLeading) {
-            // Same clearance as FreeFlightView's Home control, so every
-            // Mode list's control lands at the same height.
-            HomeControl(action: onHome)
-                .padding(.top, 40)
-                .padding(.leading, 16)
+        GeometryReader { _ in
+            ZStack {
+                backgroundMap
+                panel
+            }
+            .overlay(alignment: .topLeading) {
+                // Match Free Flight's full-window geometry before applying
+                // the normal title-bar clearance.
+                HomeControl(action: onHome)
+                    .padding(.top, 40)
+                    .padding(.leading, 16)
+            }
         }
         .ignoresSafeArea()
     }
