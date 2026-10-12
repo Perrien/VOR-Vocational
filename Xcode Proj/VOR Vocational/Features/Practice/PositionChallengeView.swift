@@ -10,18 +10,12 @@ import SwiftUI
 struct PositionChallengeView: View {
     @State private var session = FlightSession(normalizedAirportPosition: CGPoint(x: 0.5, y: 0.5))
     @State private var state: PositionChallenge.State = .inactive
-    /// The current target, normalized like `session.normalizedAircraftPosition`.
-    /// Kept separately from `state` because `.revealed`'s `Result` stores its
-    /// target already converted to unscaled map space for scoring.
+    @State private var showsPracticePanel = true
+    /// Reveal positions remain normalized so changing the chart's size when
+    /// collapsing the panel cannot move the checked fix or its target.
     @State private var target: CGPoint?
+    @State private var checkedGuess: CGPoint?
     @State private var latestImageRect: CGRect = .zero
-
-    /// The panel's drag offset from its default corner, so the player can
-    /// pull it off a VOR it happens to be sitting on. Kept outside the
-    /// chart overlay (unlike the target reveal) so it stays fixed on screen
-    /// instead of scaling and panning with the map.
-    @State private var panelOffset: CGSize = .zero
-    @State private var panelDragStart: CGSize?
 
     var onHome: () -> Void
 
@@ -30,19 +24,18 @@ struct PositionChallengeView: View {
     var body: some View {
         MapView(session: session,
                 configuration: .positionChallenge,
-                receptionPosition: target) { imageRect in
+                receptionPosition: target,
+                sidePanelTitle: "Practice",
+                isSidePanelPresented: $showsPracticePanel,
+                sidePanel: {
+                    PositionChallengePanel(state: state, onStart: start, onCheck: check, onReset: start)
+                }) { imageRect in
             challengeOverlay(imageRect: imageRect)
         }
         .overlay(alignment: .topLeading) {
             HomeControl(action: onHome)
                 .padding(.top, 40)
                 .padding(.leading, 16)
-        }
-        .overlay(alignment: .bottomTrailing) {
-            panelCard
-                .padding(16)
-                .offset(panelOffset)
-                .gesture(panelDrag)
         }
         .ignoresSafeArea()
     }
@@ -55,10 +48,13 @@ struct PositionChallengeView: View {
     @ViewBuilder
     private func challengeOverlay(imageRect: CGRect) -> some View {
         ZStack {
-            if case .revealed(let result) = state {
+            if case .revealed = state, let checkedGuess, let target {
+                let guessPoint = FlatMap.point(for: checkedGuess, in: imageRect)
+                let targetPoint = FlatMap.point(for: target, in: imageRect)
+
                 Path { path in
-                    path.move(to: result.guess)
-                    path.addLine(to: result.target)
+                    path.move(to: guessPoint)
+                    path.addLine(to: targetPoint)
                 }
                 .stroke(style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
                 .foregroundStyle(ControlPalette.accent)
@@ -66,34 +62,11 @@ struct PositionChallengeView: View {
                 Image(systemName: "mappin.circle.fill")
                     .font(.title)
                     .foregroundStyle(.red)
-                    .position(result.target)
+                    .position(targetPoint)
             }
         }
         .onAppear { latestImageRect = imageRect }
         .onChange(of: imageRect) { _, newValue in latestImageRect = newValue }
-    }
-
-    private var panelCard: some View {
-        PositionChallengePanel(state: state, onStart: start, onCheck: check, onReset: start)
-            .padding(16)
-            .frame(width: 260, alignment: .leading)
-            .background(Color(nsColor: .textBackgroundColor).opacity(0.94),
-                        in: RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.primary.opacity(0.08)))
-    }
-
-    /// Drags the panel by its own background; the default 10pt drag
-    /// threshold (unlike the map's own gestures, which need a named
-    /// coordinate space) means a plain tap still reaches the buttons inside.
-    private var panelDrag: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                let start = panelDragStart ?? panelOffset
-                if panelDragStart == nil { panelDragStart = start }
-                panelOffset = CGSize(width: start.width + value.translation.width,
-                                      height: start.height + value.translation.height)
-            }
-            .onEnded { _ in panelDragStart = nil }
     }
 
     /// Hides the target, resets the guess marker to the chart's center, and
@@ -103,6 +76,8 @@ struct PositionChallengeView: View {
         // configuration also omits the timer, but clear stale state before
         // assigning a new guess so it cannot be advanced during this reset.
         session.isFlying = false
+        showsPracticePanel = true
+        checkedGuess = nil
         session.normalizedAircraftPosition = CGPoint(x: 0.5, y: 0.5)
         let newTarget = PositionChallenge.randomTarget(stations: stations,
                                                          mapWidthNM: FlatMap.widthNM,
@@ -119,6 +94,7 @@ struct PositionChallengeView: View {
         let guessPoint = FlatMap.point(for: session.normalizedAircraftPosition, in: latestImageRect)
         let targetPoint = FlatMap.point(for: target, in: latestImageRect)
         let pixelsPerNM = FlatMap.pixelsPerNM(in: latestImageRect, mapWidthNM: FlatMap.widthNM)
+        checkedGuess = session.normalizedAircraftPosition
         state = .revealed(PositionChallenge.score(guess: guessPoint, target: targetPoint, pixelsPerNM: pixelsPerNM))
     }
 }
@@ -134,13 +110,13 @@ struct PositionChallengePanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Position Challenge")
-                .font(.subheadline.weight(.semibold))
+                .font(.headline.weight(.bold))
                 .foregroundStyle(ControlPalette.primaryText)
 
             switch state {
             case .inactive:
                 Text("Tune in-range VORs, dial OBS until the needles center, then drag the plane to your fix.")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(ControlPalette.secondaryText)
                 Button("Start Challenge", action: onStart)
                     .buttonStyle(.borderedProminent)
@@ -148,7 +124,7 @@ struct PositionChallengePanel: View {
 
             case .active:
                 Text("Drag the plane to where you think you are.")
-                    .font(.caption2)
+                    .font(.caption)
                     .foregroundStyle(ControlPalette.secondaryText)
                 Button("Check Placement", action: onCheck)
                     .buttonStyle(.borderedProminent)
@@ -163,6 +139,7 @@ struct PositionChallengePanel: View {
                     .tint(ControlPalette.accent)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

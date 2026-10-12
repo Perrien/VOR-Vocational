@@ -13,6 +13,7 @@ struct TransportMissionView: View {
     @State private var session: FlightSession
     @State private var progress: MissionFlightProgress
     @State private var completion: MissionFlightCompletion?
+    @State private var showsMissionPanel = true
     @Environment(FlightDiagnosticsStore.self) private var diagnosticsStore
 
     init(
@@ -37,7 +38,11 @@ struct TransportMissionView: View {
     }
 
     var body: some View {
-        MapView(session: session, configuration: .transportMission)
+        MapView(session: session,
+                configuration: .transportMission,
+                sidePanelTitle: "Mission",
+                isSidePanelPresented: $showsMissionPanel,
+                sidePanel: { flightCard })
             .overlay(alignment: .topLeading) {
                 HStack(spacing: 10) {
                     HomeControl(action: leaveForHome)
@@ -48,10 +53,6 @@ struct TransportMissionView: View {
                 }
                 .padding(.top, 40)
                 .padding(.leading, 16)
-            }
-            .overlay(alignment: .bottomTrailing) {
-                flightCard
-                    .padding(16)
             }
             .ignoresSafeArea()
             .onAppear {
@@ -67,7 +68,7 @@ struct TransportMissionView: View {
     private var missionCard: some View {
         let step = briefing.steps[progress.activeInstructionIndex]
 
-        return VStack(alignment: .leading, spacing: 12) {
+        return VStack(alignment: .leading, spacing: 10) {
             Text("Transport")
                 .font(.headline.weight(.bold))
                 .foregroundStyle(ControlPalette.primaryText)
@@ -132,11 +133,7 @@ struct TransportMissionView: View {
             .buttonStyle(.borderedProminent)
             .tint(.orange)
         }
-        .padding(16)
-        .frame(width: 310, alignment: .leading)
-        .background(Color(nsColor: .textBackgroundColor).opacity(0.96),
-                    in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.primary.opacity(0.1)))
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var resultCard: some View {
@@ -171,11 +168,7 @@ struct TransportMissionView: View {
                 .buttonStyle(.bordered)
                 .frame(maxWidth: .infinity)
         }
-        .padding(16)
-        .frame(width: 310, alignment: .leading)
-        .background(Color(nsColor: .textBackgroundColor).opacity(0.96),
-                    in: RoundedRectangle(cornerRadius: 16))
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.primary.opacity(0.1)))
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -213,6 +206,7 @@ struct TransportMissionView: View {
 
     private func completeFlight() {
         session.isFlying = false
+        showsMissionPanel = true
         completion = MissionFlightCompletion(
             resolvedPlan: resolvedPlan,
             aircraftPosition: session.normalizedAircraftPosition,
@@ -230,6 +224,7 @@ struct TransportMissionView: View {
         session = FlightSession(normalizedAirportPosition: origin.normalizedPosition)
         progress = MissionFlightProgress(instructionCount: briefing.steps.count)
         completion = nil
+        showsMissionPanel = true
         diagnosticsStore.activeSession = session
     }
 

@@ -1,8 +1,8 @@
 import SwiftUI
 import AppKit
 
-/// A flat map with VOR stations and a draggable plane, plus NAV radios below it.
-struct MapView<ChartOverlay: View>: View {
+/// A flat map with an optional side panel, above the full-width NAV cockpit.
+struct MapView<ChartOverlay: View, SidePanel: View>: View {
     @Bindable var session: FlightSession
     private let configuration: FlightSurfaceConfiguration
 
@@ -11,6 +11,13 @@ struct MapView<ChartOverlay: View>: View {
     /// `imageRect` this view already threads through `FlatMap.point(for:in:)`.
     /// Defaults to none, so Free Flight's rendering is unaffected.
     private let chartOverlay: (CGRect) -> ChartOverlay
+
+    /// Mode-owned content beside the chart. Its visibility changes only the
+    /// chart's available space, keeping the cockpit and flight session intact.
+    private let sidePanel: () -> SidePanel
+    private let sidePanelTitle: String
+    private let isSidePanelPresented: Binding<Bool>?
+    private let sidePanelWidth: CGFloat = 340
 
     /// Overrides what the NAV radios receive from, independent of the plane
     /// icon's own (draggable) position. Defaults to nil, so reception keeps
@@ -22,10 +29,16 @@ struct MapView<ChartOverlay: View>: View {
     init(session: FlightSession,
          configuration: FlightSurfaceConfiguration = .freeFlight,
          receptionPosition: CGPoint? = nil,
+         sidePanelTitle: String = "Details",
+         isSidePanelPresented: Binding<Bool>? = nil,
+         @ViewBuilder sidePanel: @escaping () -> SidePanel = { EmptyView() },
          @ViewBuilder chartOverlay: @escaping (CGRect) -> ChartOverlay = { _ in EmptyView() }) {
         _session = Bindable(session)
         self.configuration = configuration
         self.receptionPosition = receptionPosition
+        self.sidePanelTitle = sidePanelTitle
+        self.isSidePanelPresented = isSidePanelPresented
+        self.sidePanel = sidePanel
         self.chartOverlay = chartOverlay
     }
 
@@ -48,9 +61,10 @@ struct MapView<ChartOverlay: View>: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let mapWidth = geometry.size.width
-            let cockpitHeight = CockpitLayout.height(forWidth: mapWidth)
-            let mapSize = CGSize(width: mapWidth,
+            let surfaceWidth = geometry.size.width
+            let cockpitHeight = CockpitLayout.height(forWidth: surfaceWidth)
+            let showsSidePanel = isSidePanelPresented?.wrappedValue == true
+            let mapSize = CGSize(width: max(0, surfaceWidth - (showsSidePanel ? sidePanelWidth + 1 : 0)),
                                  height: max(0, geometry.size.height - cockpitHeight))
             // The cropped map image is aspect-fit inside the map area, so
             // everything on the map is positioned relative to this fitted rect.
@@ -60,12 +74,31 @@ struct MapView<ChartOverlay: View>: View {
             let nav2Reading = receiverReading(for: session.nav2)
 
             VStack(spacing: 0) {
-                mapArea(mapSize: mapSize, imageRect: imageRect, planePos: planePos)
-                    .overlay(alignment: .topTrailing) {
-                        // The window's title bar sits on top of our
-                        // ignoresSafeArea() content, so this needs more
-                        // top clearance than a plain corner inset to stay
-                        // fully clear of it.
+                HStack(spacing: 0) {
+                    mapArea(mapSize: mapSize, imageRect: imageRect, planePos: planePos)
+
+                    if showsSidePanel {
+                        Divider()
+                        ScrollView {
+                            sidePanel()
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 16)
+                        }
+                        // Keep the instructions below the persistent corner
+                        // controls, even when the panel content is scrolled.
+                        .padding(.top, 80)
+                        .frame(width: sidePanelWidth, height: mapSize.height)
+                        .background(Color(nsColor: .windowBackgroundColor))
+                    }
+                }
+                .frame(height: mapSize.height)
+                .overlay(alignment: .topTrailing) {
+                    // The window's title bar sits on top of our
+                    // ignoresSafeArea() content, so this needs more
+                    // top clearance than a plain corner inset to stay
+                    // fully clear of it.
+                    HStack(spacing: 10) {
                         ChartButton(showVORs: $session.showVORs,
                                     visibleVORServiceVolumes: $session.visibleVORServiceVolumes,
                                     showAirports: $session.showAirports,
@@ -74,11 +107,23 @@ struct MapView<ChartOverlay: View>: View {
                                     showSightseeingRegions: $session.showSightseeingRegions,
                                     showSightseeingRegionNames: $session.showSightseeingRegionNames,
                                     gridSizeNM: $session.gridSizeNM)
-                            .padding(.top, 40)
-                            .padding(.trailing, 16)
-                    }
 
-                CockpitPanel(mapWidth: mapWidth, onSwap: { session.swapNAVReceivers() }) {
+                        if let isSidePanelPresented {
+                            Button {
+                                isSidePanelPresented.wrappedValue.toggle()
+                            } label: {
+                                Label("\(showsSidePanel ? "Hide" : "Show") \(sidePanelTitle)",
+                                      systemImage: "sidebar.right")
+                            }
+                            .buttonStyle(.glass)
+                            .help("\(showsSidePanel ? "Hide" : "Show") the \(sidePanelTitle.lowercased()) panel")
+                        }
+                    }
+                    .padding(.top, 40)
+                    .padding(.trailing, 16)
+                }
+
+                CockpitPanel(mapWidth: surfaceWidth, onSwap: { session.swapNAVReceivers() }) {
                     if configuration.showsHeadingPresentation {
                         PlaneControlView(heading: session.heading,
                                          selectedHeading: $session.selectedHeading,
@@ -117,6 +162,9 @@ struct MapView<ChartOverlay: View>: View {
             // Re-clamp the pan whenever the zoom changes (e.g. via scroll) so
             // the map never drifts off the visible area.
             .onChange(of: session.zoom) {
+                session.pan = clampedPan(session.pan, zoom: session.zoom, mapSize: mapSize)
+            }
+            .onChange(of: mapSize) {
                 session.pan = clampedPan(session.pan, zoom: session.zoom, mapSize: mapSize)
             }
             .onAppear {

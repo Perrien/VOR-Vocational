@@ -13,6 +13,7 @@ What can be tried today:
 - Pan and zoom the chart; show airports, VORs, selected-station range rings, radials, a grid, and sightseeing markers.
 - Start a Position Challenge, use the instruments to infer a hidden location, drag the aircraft marker to the guess, and see the error in nautical miles. Its stationary guess marker cannot be moved by flight simulation.
 - Open Missions → Transport → Briefing to inspect the supplied Silverkeep-to-Midland route, its 99.2-NM still-air plan, and five VOR instructions; then fly it from Silverkeep using the cockpit instruments. The live mission deliberately hides the aircraft's true chart position and planned route.
+- Read live Transport or Position Challenge instructions and results in the panel beside the chart, above the full-width cockpit. Use Hide Mission / Show Mission or Hide Practice / Show Practice beside Chart to collapse or reopen it.
 - Select Flight Complete whenever you judge you have arrived; the result shows simulated time and direct distance from Midland, with Fly Again starting a completely fresh flight.
 
 ## How to run it
