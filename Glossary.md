@@ -12,7 +12,11 @@ An open, unscored session on the Myosia chart. The player chooses what to explor
 A focused activity that teaches or rehearses one navigation skill, such as finding a position fix or intercepting and tracking a radial.
 
 **Mission**  
-A scored flight with a concrete operational objective that combines navigation skills.
+A flight with a concrete operational objective that combines navigation skills. Scoring and debrief can assess how it was flown.
+
+**Debrief**
+
+A review after a flight ends, comparing the planned route with the flown path and showing the flight conditions and ending measurements.
 
 **Position Challenge**  
 A Practice exercise in which the app hides the real position, the player uses VOR indications to infer it, then places a guess on the chart and sees the error in nautical miles.
@@ -50,6 +54,20 @@ A route point defined by where two VOR radials meet. A stored radial is measured
 
 **Still-air estimate**  
 The planned travel time calculated from route distance and cruise speed before wind is considered.
+
+## Wind
+
+**Calm**
+
+Zero wind, producing no wind drift.
+
+**Steady wind**
+
+Wind whose direction and speed remain constant throughout a flight.
+
+**Wind from**
+
+The bearing of the direction the wind comes from. Wind from 270° comes from the west and blows toward the east. Use this label wherever wind direction is shown, including the briefing, live mission reference, and debrief.
 
 ## World
 

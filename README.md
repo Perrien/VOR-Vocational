@@ -14,7 +14,10 @@ What can be tried today:
 - Start a Position Challenge, use the instruments to infer a hidden location, drag the aircraft marker to the guess, and see the error in nautical miles. Its stationary guess marker cannot be moved by flight simulation.
 - Open Missions → Transport → Briefing to inspect the supplied Silverkeep-to-Midland route, its 99.2-NM still-air plan, and five VOR instructions; then fly it from Silverkeep using the cockpit instruments. The live mission deliberately hides the aircraft's true chart position and planned route.
 - Read live Transport or Position Challenge instructions and results in the panel beside the chart, above the full-width cockpit. Use Hide Mission / Show Mission or Hide Practice / Show Practice beside Chart to collapse or reopen it.
+- During Transport, scroll through all five instructions and check off each step yourself. Check or clear any step independently; hiding the panel retains your checks, and Fly Again clears them.
 - Select Flight Complete whenever you judge you have arrived; the result shows simulated time and direct distance from Midland, with Fly Again starting a completely fresh flight.
+
+The next initiative, [I-003 — Mission quality and debrief](Explorations/I-003-mission-quality-and-debrief.md), has a design ready for a focused build plan: Calm / editable Steady wind, timed flight recording, and a dedicated unscored planned-versus-flown debrief. Scoring follows later, after these can be tried with actual flights.
 
 ## How to run it
 
@@ -50,5 +53,6 @@ The intended shape is simple: the world and aircraft state feed the receiver/ins
 
 - `IDEAS.md` is the forward-looking list: active initiatives, ideas, blockers, and next slices.
 - `Glossary.md` defines the vocabulary used in discussion and UI.
+- `Explorations/` holds each explored idea's linked design, settled requirements, and remaining questions.
 - `Plans/` is created when a focused build plan is needed; finished plans are retained in `Plans/Archived/`.
 - `Design/` is older reference material. Its flight-planning notes remain useful background, but its ticket, ADR, exploration, and execution-protocol process is retired.

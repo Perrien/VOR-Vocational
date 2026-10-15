@@ -603,22 +603,34 @@ final class NavigationCoreTests: XCTestCase {
                        ident: "ELS", frequencyMHz: 112, obsDegrees: 353, flag: .from)
     }
 
-    func testMissionFlightProgressRequiresExplicitAdvance() {
+    func testMissionFlightChecklistAllowsIndependentCompletionAndReopening() {
         var progress = MissionFlightProgress(instructionCount: 5)
 
-        XCTAssertEqual(progress.activeInstructionIndex, 0)
-        XCTAssertEqual(progress.activeInstructionNumber, 1)
-        XCTAssertTrue(progress.canAdvance)
+        XCTAssertTrue(progress.completedInstructionIndices.isEmpty)
 
-        for expectedIndex in 1...4 {
-            XCTAssertTrue(progress.advanceInstruction())
-            XCTAssertEqual(progress.activeInstructionIndex, expectedIndex)
-            XCTAssertEqual(progress.activeInstructionNumber, expectedIndex + 1)
+        // Mark the final reference first, then an earlier step. Neither edit
+        // implicitly completes any of the intervening instructions.
+        progress.setInstructionComplete(true, at: 4)
+        progress.setInstructionComplete(true, at: 1)
+        progress.setInstructionComplete(true, at: 1)
+        XCTAssertEqual(progress.completedInstructionIndices, [1, 4])
+        XCTAssertFalse(progress.isInstructionComplete(at: 0))
+        XCTAssertTrue(progress.isInstructionComplete(at: 4))
+
+        // Revisiting an earlier step preserves the other completed steps.
+        progress.setInstructionComplete(false, at: 1)
+        XCTAssertEqual(progress.completedInstructionIndices, [4])
+        XCTAssertFalse(progress.isInstructionComplete(at: 1))
+
+        for index in 0..<progress.instructionCount {
+            progress.setInstructionComplete(true, at: index)
         }
+        XCTAssertEqual(progress.completedInstructionIndices.count, 5)
+        progress.setInstructionComplete(false, at: 0)
+        XCTAssertEqual(progress.completedInstructionIndices, [1, 2, 3, 4])
 
-        XCTAssertFalse(progress.canAdvance)
-        XCTAssertFalse(progress.advanceInstruction())
-        XCTAssertEqual(progress.activeInstructionIndex, 4)
+        let freshFlight = MissionFlightProgress(instructionCount: 5)
+        XCTAssertTrue(freshFlight.completedInstructionIndices.isEmpty)
     }
 
     func testMissionFlightCompletionMeasuresRawDistanceFromDestination() throws {

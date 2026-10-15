@@ -1,32 +1,29 @@
 import CoreGraphics
 import Foundation
 
-/// Player-controlled progress through a supplied mission's ordered briefing
-/// actions. Advancing an instruction never inspects aircraft position: the
-/// player decides when a navigation cue has been satisfied.
+/// Player-controlled checklist for a supplied mission's ordered briefing
+/// actions. Completion never inspects aircraft position: the player decides
+/// when a navigation cue has been satisfied and can revisit any instruction.
 nonisolated struct MissionFlightProgress: Equatable {
     let instructionCount: Int
-    private(set) var activeInstructionIndex: Int = 0
+    private(set) var completedInstructionIndices: Set<Int> = []
 
     init(instructionCount: Int) {
         precondition(instructionCount > 0, "A mission needs at least one instruction.")
         self.instructionCount = instructionCount
     }
 
-    var activeInstructionNumber: Int {
-        activeInstructionIndex + 1
+    func isInstructionComplete(at index: Int) -> Bool {
+        completedInstructionIndices.contains(index)
     }
 
-    var canAdvance: Bool {
-        activeInstructionIndex + 1 < instructionCount
-    }
-
-    /// Returns whether there was another instruction to activate.
-    @discardableResult
-    mutating func advanceInstruction() -> Bool {
-        guard canAdvance else { return false }
-        activeInstructionIndex += 1
-        return true
+    mutating func setInstructionComplete(_ isComplete: Bool, at index: Int) {
+        precondition((0..<instructionCount).contains(index), "Instruction index must belong to the mission.")
+        if isComplete {
+            completedInstructionIndices.insert(index)
+        } else {
+            completedInstructionIndices.remove(index)
+        }
     }
 }
 

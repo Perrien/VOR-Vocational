@@ -66,9 +66,7 @@ struct TransportMissionView: View {
     }
 
     private var missionCard: some View {
-        let step = briefing.steps[progress.activeInstructionIndex]
-
-        return VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Transport")
                 .font(.headline.weight(.bold))
                 .foregroundStyle(ControlPalette.primaryText)
@@ -78,27 +76,15 @@ struct TransportMissionView: View {
 
             Divider()
 
-            Text("STEP \(progress.activeInstructionNumber) OF \(briefing.steps.count)")
+            Text("\(progress.completedInstructionIndices.count) OF \(briefing.steps.count) STEPS COMPLETE")
                 .font(.caption2.weight(.bold).monospacedDigit())
                 .foregroundStyle(ControlPalette.accent)
-            Text(step.kind == .terminalReference ? "Final position reference" : step.title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ControlPalette.primaryText)
-            Text("Tune \(step.guidance.stationIdent) \(String(format: "%.2f", step.guidance.frequencyMHz))")
-                .font(.caption.monospacedDigit())
+            Text("Check off steps as you complete them. Clear a check to revisit a step.")
+                .font(.caption)
                 .foregroundStyle(ControlPalette.secondaryText)
-            Text("Set OBS \(String(format: "%03d", step.guidance.obsDegrees))° · Confirm \(step.guidance.flag.rawValue)")
-                .font(.caption.monospacedDigit().weight(.semibold))
-                .foregroundStyle(ControlPalette.primaryText)
 
-            if step.kind == .terminalReference {
-                Text("Use this practical radial reference to locate Midland before marking the flight complete.")
-                    .font(.caption)
-                    .foregroundStyle(ControlPalette.secondaryText)
-            } else {
-                Text("Advance when you judge this instruction is complete.")
-                    .font(.caption)
-                    .foregroundStyle(ControlPalette.secondaryText)
+            ForEach(Array(briefing.steps.enumerated()), id: \.offset) { index, step in
+                instructionRow(step, at: index)
             }
 
             Divider()
@@ -113,19 +99,6 @@ struct TransportMissionView: View {
                     .foregroundStyle(ControlPalette.primaryText)
             }
 
-            if progress.canAdvance {
-                Button("Next instruction") {
-                    progress.advanceInstruction()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ControlPalette.accent)
-                .frame(maxWidth: .infinity)
-            } else {
-                Text("Final instruction active")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.orange)
-            }
-
             Button(role: .destructive, action: completeFlight) {
                 Label("Flight Complete", systemImage: "flag.checkered")
                     .frame(maxWidth: .infinity)
@@ -134,6 +107,42 @@ struct TransportMissionView: View {
             .tint(.orange)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func instructionRow(_ step: FlightPlanBriefingStep, at index: Int) -> some View {
+        let title = step.kind == .terminalReference ? "Final position reference" : step.title
+
+        return VStack(alignment: .leading, spacing: 6) {
+            Toggle(isOn: Binding(
+                get: { progress.isInstructionComplete(at: index) },
+                set: { progress.setInstructionComplete($0, at: index) }
+            )) {
+                Text("\(index + 1). \(title)")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ControlPalette.primaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .toggleStyle(.checkbox)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Tune \(step.guidance.stationIdent) \(String(format: "%.2f", step.guidance.frequencyMHz))")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(ControlPalette.secondaryText)
+                Text("Set OBS \(String(format: "%03d", step.guidance.obsDegrees))° · Confirm \(step.guidance.flag.rawValue)")
+                    .font(.caption.monospacedDigit().weight(.semibold))
+                    .foregroundStyle(ControlPalette.primaryText)
+
+                if step.kind == .terminalReference {
+                    Text("Use this practical radial reference to locate Midland before marking the flight complete.")
+                        .font(.caption)
+                        .foregroundStyle(ControlPalette.secondaryText)
+                }
+            }
+            .padding(.leading, 20)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 10))
     }
 
     private var resultCard: some View {

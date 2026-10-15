@@ -2,19 +2,17 @@
 
 Each entry is one individually addressable idea. Refer to its ID—for example, “explore `I-003`,” “explore `I-005`,” or “delete `I-006`.” IDs never change or get reused. The status sections make the list easy to scan; they do not turn a collection of ideas into a project history.
 
-## Needs exploration
+## Ready to plan
 
 ### I-003 — Mission quality and debrief
 
-**Status:** Needs exploration
+**Status:** Ready to plan
 **Type:** Initiative
-**Next action:** `a-explore I-003`
+**Next action:** `a-plan I-003` for wind, recording, and the first unscored debrief
 
-**What it is:** Add a deterministic steady wind to the supplied mission, record the flown path, and show planned versus actual track in a debrief.
+**What it is:** Offer Calm or randomly populated, editable Steady wind, record the supplied mission's flown path, and show an unscored planned-versus-flown debrief on Flight Complete or flying off the map. Instruction checkmarks remain player assists and never affect scoring.
 
-**Already decided:** Route tracking and arrival accuracy should remain separate measures. The Silverkeep-to-Midland mission's proposed weighting is 35% route tracking and 65% arrival accuracy.
-
-**Open questions:** What a fair beginner-facing score and debrief should show, and what V0.3 needs to record now so that later work remains straightforward.
+**Exploration:** [Wind, recording, and first debrief design](Explorations/I-003-mission-quality-and-debrief.md)
 
 ## Later
 
