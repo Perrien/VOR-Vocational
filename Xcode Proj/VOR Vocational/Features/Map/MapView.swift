@@ -131,6 +131,7 @@ struct MapView<ChartOverlay: View, SidePanel: View>: View {
                                          isFlying: $session.isFlying,
                                          timeMultiplier: $session.timeMultiplier,
                                          showsFlightControls: configuration.showsFlightControls)
+                            .disabled(session.completion != nil)
                     }
                 } nav1: {
                     NavRadioView(
@@ -274,15 +275,8 @@ struct MapView<ChartOverlay: View, SidePanel: View>: View {
             }
 
             if configuration.allowsAircraftSimulation {
-                FlightTimerView(normalizedAircraftPosition: $session.normalizedAircraftPosition,
-                                heading: $session.heading,
-                                selectedHeading: $session.selectedHeading,
-                                speedKnots: $session.speedKnots,
-                                isFlying: $session.isFlying,
-                                timeMultiplier: $session.timeMultiplier,
-                                elapsedSimulatedSeconds: $session.elapsedSimulatedSeconds,
-                                mapBounds: imageRect,
-                                pixelsPerNM: pixelsPerNM(in: imageRect))
+                FlightTimerView(session: session)
+                    .id(ObjectIdentifier(session))
             }
         }
         .frame(width: mapSize.width, height: mapSize.height)
@@ -505,67 +499,29 @@ private struct CockpitPanel<Heading: View, Nav1: View, Nav2: View>: View {
     }
 }
 
-/// Advances the plane while flight is enabled. The bindings keep the loop tied
-/// to the latest heading and speed even while the controls are being edited.
+/// Delivers monotonic timing only. The session owns all simulated movement.
 private struct FlightTimerView: View {
-    @Binding var normalizedAircraftPosition: CGPoint
-    @Binding var heading: Double
-    @Binding var selectedHeading: Double
-    @Binding var speedKnots: Double
-    @Binding var isFlying: Bool
-    @Binding var timeMultiplier: Double
-    @Binding var elapsedSimulatedSeconds: TimeInterval
-
-    let mapBounds: CGRect
-    let pixelsPerNM: CGFloat
+    let session: FlightSession
 
     var body: some View {
         Color.clear
             .frame(width: 0, height: 0)
-            .task(id: isFlying) {
-                await runFlightLoop()
-            }
+            .task(id: session.isFlying) { await runFlightLoop() }
     }
 
     private func runFlightLoop() async {
-        guard isFlying else { return }
-
-        var lastUpdate = Date()
-        while !Task.isCancelled {
-            try? await Task.sleep(nanoseconds: 16_000_000)
-            guard !Task.isCancelled else { return }
-
-            let now = Date()
-            let elapsed = min(max(now.timeIntervalSince(lastUpdate), 0), 0.1)
+        guard session.isFlying else { return }
+        let clock = ContinuousClock()
+        var lastUpdate = clock.now
+        while !Task.isCancelled && session.isFlying {
+            do { try await clock.sleep(for: .milliseconds(16)) }
+            catch { return }
+            guard !Task.isCancelled && session.isFlying else { return }
+            let now = clock.now
+            let duration = lastUpdate.duration(to: now).components
             lastUpdate = now
-            advancePlane(by: elapsed)
+            session.advance(wallElapsed: Double(duration.seconds) + Double(duration.attoseconds) / 1e18)
         }
-    }
-
-    private func advancePlane(by elapsed: TimeInterval) {
-        let simulatedElapsed = elapsed * timeMultiplier
-        elapsedSimulatedSeconds += simulatedElapsed
-
-        heading = FlightPhysics.turn(
-            heading: heading,
-            toward: selectedHeading,
-            elapsed: simulatedElapsed
-        )
-
-        let currentPosition = FlatMap.point(for: normalizedAircraftPosition, in: mapBounds)
-        let localPosition = CGPoint(x: currentPosition.x - mapBounds.minX,
-                                    y: currentPosition.y - mapBounds.minY)
-        let nextLocalPosition = FlightPhysics.advance(position: localPosition, heading: heading,
-                                                       speedKnots: speedKnots,
-                                                       elapsed: simulatedElapsed,
-                                                       pixelsPerNM: pixelsPerNM,
-                                                       bounds: mapBounds.size)
-        guard let nextNormalizedPosition = FlatMap.sourcePosition(
-            for: CGPoint(x: nextLocalPosition.x + mapBounds.minX,
-                         y: nextLocalPosition.y + mapBounds.minY),
-            in: mapBounds
-        ) else { return }
-        normalizedAircraftPosition = nextNormalizedPosition
     }
 }
 

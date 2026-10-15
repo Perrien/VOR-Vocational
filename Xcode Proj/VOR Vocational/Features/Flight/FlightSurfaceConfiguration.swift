@@ -37,9 +37,9 @@ struct FlightSurfaceConfiguration: Equatable {
         showsAircraftMarker: true
     )
 
-    /// The first supplied mission uses the normal live cockpit while keeping
+    /// Missions use the normal live cockpit while keeping
     /// the aircraft's true chart location hidden from the player.
-    static let transportMission = FlightSurfaceConfiguration(
+    static let mission = FlightSurfaceConfiguration(
         showsAirportsByDefault: true,
         showsSightseeingRegionNamesByDefault: false,
         allowsAircraftSimulation: true,
@@ -47,4 +47,6 @@ struct FlightSurfaceConfiguration: Equatable {
         showsFlightControls: true,
         showsAircraftMarker: false
     )
+
+    static let transportMission = mission
 }

@@ -7,22 +7,28 @@ import SwiftUI
 struct FlatMap: View {
     /// The rect the map image occupies within the map area.
     let imageRect: CGRect
+    private let crop: CGRect
+
+    init(imageRect: CGRect, crop: CGRect = FlatMap.sourceCrop) {
+        self.imageRect = imageRect
+        self.crop = crop
+    }
 
     /// The ocean fill shown around the letterboxed map (SVG ocean base #a9c9d4).
     static let oceanColor = Color(red: 169 / 255, green: 201 / 255, blue: 212 / 255)
 
     /// Native aspect ratio of the uncropped source artwork. This remains the
     /// calibration basis for the 500-NM-wide navigation world.
-    static let sourceMapAspect: CGFloat = 1748.0 / 1254.0
+    static let sourceMapAspect = CGFloat(FlightWorld.sourceAspect)
 
     /// The source map's real-world width, in nautical miles. Shared by the
     /// flight surface and Flight Diagnostics so both compute reception and
     /// CDI from the same scale.
-    static let widthNM: Double = 500
+    static let widthNM = FlightWorld.widthNM
 
     /// The source map's real-world height, derived from its own aspect ratio
     /// so north-south distances use the same NM-per-pixel scale as east-west.
-    static var heightNM: Double { widthNM / Double(sourceMapAspect) }
+    static let heightNM = FlightWorld.heightNM
 
     /// Presentation crop measured from the supplied red guide: x 178...3118,
     /// y 264...2036 in the 3496 × 2508 PNG. Edit these normalized values to
@@ -36,12 +42,13 @@ struct FlatMap: View {
     static let mapAspect: CGFloat = sourceMapAspect * sourceCrop.width / sourceCrop.height
 
     /// Aspect-fits the map artwork within `area`, centered.
-    static func fittedRect(in area: CGSize) -> CGRect {
+    static func fittedRect(in area: CGSize, crop: CGRect = sourceCrop) -> CGRect {
         guard area.width > 0, area.height > 0 else { return .zero }
         let areaAspect = area.width / area.height
-        let size: CGSize = areaAspect > mapAspect
-            ? CGSize(width: area.height * mapAspect, height: area.height)
-            : CGSize(width: area.width, height: area.width / mapAspect)
+        let aspect = sourceMapAspect * crop.width / crop.height
+        let size: CGSize = areaAspect > aspect
+            ? CGSize(width: area.height * aspect, height: area.height)
+            : CGSize(width: area.width, height: area.width / aspect)
         return CGRect(
             x: (area.width - size.width) / 2,
             y: (area.height - size.height) / 2,
@@ -51,10 +58,10 @@ struct FlatMap: View {
     }
 
     /// Projects a full-source normalized coordinate into the cropped image rect.
-    static func point(for sourcePosition: CGPoint, in imageRect: CGRect) -> CGPoint {
+    static func point(for sourcePosition: CGPoint, in imageRect: CGRect, crop: CGRect = sourceCrop) -> CGPoint {
         CGPoint(
-            x: imageRect.minX + (sourcePosition.x - sourceCrop.minX) / sourceCrop.width * imageRect.width,
-            y: imageRect.minY + (sourcePosition.y - sourceCrop.minY) / sourceCrop.height * imageRect.height
+            x: imageRect.minX + (sourcePosition.x - crop.minX) / crop.width * imageRect.width,
+            y: imageRect.minY + (sourcePosition.y - crop.minY) / crop.height * imageRect.height
         )
     }
 
@@ -83,13 +90,13 @@ struct FlatMap: View {
             ZStack {
                 Image("MyosiaMap")
                     .resizable()
-                    .frame(width: imageRect.width / FlatMap.sourceCrop.width,
-                           height: imageRect.height / FlatMap.sourceCrop.height)
+                    .frame(width: imageRect.width / crop.width,
+                           height: imageRect.height / crop.height)
                     .position(
-                        x: imageRect.width / FlatMap.sourceCrop.width / 2
-                            - FlatMap.sourceCrop.minX * imageRect.width / FlatMap.sourceCrop.width,
-                        y: imageRect.height / FlatMap.sourceCrop.height / 2
-                            - FlatMap.sourceCrop.minY * imageRect.height / FlatMap.sourceCrop.height
+                        x: imageRect.width / crop.width / 2
+                            - crop.minX * imageRect.width / crop.width,
+                        y: imageRect.height / crop.height / 2
+                            - crop.minY * imageRect.height / crop.height
                     )
             }
             .frame(width: imageRect.width, height: imageRect.height)

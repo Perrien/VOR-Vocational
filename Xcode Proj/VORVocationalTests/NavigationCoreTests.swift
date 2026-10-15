@@ -662,9 +662,9 @@ final class NavigationCoreTests: XCTestCase {
         )
 
         XCTAssertEqual(atDestination.simulatedElapsedSeconds, 321)
-        XCTAssertEqual(atDestination.distanceFromDestinationNM, 0, accuracy: 0.000_001)
+        XCTAssertEqual(try XCTUnwrap(atDestination.distanceFromDestinationNM), 0, accuracy: 0.000_001)
         XCTAssertEqual(fiftyNMWest.simulatedElapsedSeconds, 654)
-        XCTAssertEqual(fiftyNMWest.distanceFromDestinationNM, 50, accuracy: 0.000_001)
+        XCTAssertEqual(try XCTUnwrap(fiftyNMWest.distanceFromDestinationNM), 50, accuracy: 0.000_001)
     }
 
     func testIndependentlyTunedReceiversResolveOwnStations() {
@@ -705,6 +705,261 @@ final class NavigationCoreTests: XCTestCase {
     func testFlightPlanCatalogNamesMissingBundleResource() {
         XCTAssertThrowsError(try FlightPlanCatalog.load(named: "NoSuchPlan")) { error in
             XCTAssertEqual(error as? FlightPlanCatalog.CatalogError, .resourceNotFound("NoSuchPlan"))
+        }
+    }
+
+    func testWindFromCardinalDirectionsAndZeroWindMode() throws {
+        let start = FlightAircraftState(normalizedPosition: CGPoint(x: 0.5, y: 0.5), speedKnots: 0)
+        for (bearing, east, south) in [(0, 0.0, 20.0), (90, -20.0, 0.0),
+                                       (180, 0.0, -20.0), (270, 20.0, 0.0)] {
+            let wind = try XCTUnwrap(SteadyWind(fromDegrees: bearing, speedKnots: 20))
+            let end = FlightPhysics.Trajectory(start: start, selectedHeading: 0,
+                                               conditions: .steady(wind)).state(at: 3_600)
+            let originNM = FlightWorld.nauticalMiles(for: start.normalizedPosition)
+            assertPoint(FlightWorld.nauticalMiles(for: end.normalizedPosition),
+                        equals: CGPoint(x: originNM.x + east, y: originNM.y + south), accuracy: 1e-7)
+        }
+        let zero = FlightConditions.steady(try XCTUnwrap(SteadyWind(fromDegrees: 359, speedKnots: 0)))
+        XCTAssertNotEqual(zero, .calm)
+        XCTAssertEqual(zero.windVelocity, .zero)
+        XCTAssertNil(SteadyWind(fromDegrees: 360, speedKnots: 20))
+        XCTAssertNil(SteadyWind(fromDegrees: 0, speedKnots: 41))
+    }
+
+    func testDirectTrajectoryIntegratesKnownArcAndStraightRemainder() {
+        let start = FlightAircraftState(normalizedPosition: .zero, speedKnots: 120)
+        let trajectory = FlightPhysics.Trajectory(start: start, selectedHeading: 90, conditions: .calm)
+        // At 120 kt and 3°/s the quarter-circle radius is 2/π NM.
+        let radius = 2 / Double.pi
+        let quarter = trajectory.state(at: 30)
+        assertPoint(FlightWorld.nauticalMiles(for: quarter.normalizedPosition),
+                    equals: CGPoint(x: radius, y: -radius), accuracy: 1e-7)
+        XCTAssertEqual(quarter.heading, 90, accuracy: 1e-7)
+        let remainder = trajectory.state(at: 60)
+        assertPoint(FlightWorld.nauticalMiles(for: remainder.normalizedPosition),
+                    equals: CGPoint(x: radius + 1, y: -radius), accuracy: 1e-7)
+        let left = FlightPhysics.Trajectory(start: start, selectedHeading: 270, conditions: .calm).state(at: 30)
+        assertPoint(FlightWorld.nauticalMiles(for: left.normalizedPosition),
+                    equals: CGPoint(x: -radius, y: -radius), accuracy: 1e-7)
+    }
+
+    func testBothRepresentationsOfHalfTurnGoRight() {
+        XCTAssertEqual(FlightPhysics.turn(heading: 0, toward: 180, elapsed: 1), 3)
+        XCTAssertEqual(FlightPhysics.turn(heading: 270, toward: 90, elapsed: 1), 273)
+        let start = FlightAircraftState(normalizedPosition: .zero, heading: 270, speedKnots: 120)
+        let end = FlightPhysics.Trajectory(start: start, selectedHeading: 90, conditions: .calm).state(at: 60)
+        assertPoint(FlightWorld.nauticalMiles(for: end.normalizedPosition),
+                    equals: CGPoint(x: 0, y: -4 / Double.pi), accuracy: 1e-7)
+        XCTAssertEqual(end.heading, 90, accuracy: 1e-7)
+    }
+
+    @MainActor
+    func testOneHourMotionAndEverySecondAgreeAcrossPlaybackPartitions() throws {
+        let initial = FlightAircraftState(normalizedPosition: CGPoint(x: 0.4, y: 0.5))
+        let phases: [(seconds: Int, target: Double, speed: Double)] = [
+            (30, 90, 260), (60, 270, 120), (83, 350, 260),
+            (48, 10, 0), (579, 77, 120), (2_800, 180, 260),
+        ]
+        let windy = FlightConditions.steady(try XCTUnwrap(SteadyWind(fromDegrees: 270, speedKnots: 40)))
+        for conditions in [FlightConditions.calm, windy] {
+            for multiplier in [1.0, 5, 10, 30] {
+                let session = FlightSession(initialState: initial, conditions: conditions)
+                session.timeMultiplier = multiplier
+                session.isFlying = true
+                var reference = initial
+                var tick = 0
+                for phase in phases {
+                    session.selectedHeading = phase.target
+                    session.speedKnots = phase.speed
+                    let trajectory = FlightPhysics.Trajectory(
+                        start: FlightAircraftState(normalizedPosition: reference.normalizedPosition,
+                                                   heading: reference.heading, speedKnots: phase.speed),
+                        selectedHeading: phase.target, conditions: conditions)
+                    for second in 1...phase.seconds {
+                        var remaining = 1.0
+                        while remaining > 0 {
+                            let wallPattern = [0.016, 0.041, 0.003, 0.23, 0.09]
+                            let simulated = min(remaining, wallPattern[tick % wallPattern.count] * multiplier)
+                            session.advance(wallElapsed: simulated / multiplier)
+                            remaining -= simulated
+                            tick += 1
+                        }
+                        let expected = trajectory.state(at: Double(second))
+                        let distance = VORNavigation.distanceNM(
+                            fromNormalized: session.normalizedAircraftPosition,
+                            toNormalized: expected.normalizedPosition,
+                            mapWidthNM: FlightWorld.widthNM, mapHeightNM: FlightWorld.heightNM)
+                        XCTAssertLessThanOrEqual(distance, 1e-6)
+                        XCTAssertEqual(VORNavigation.normalize180(session.heading - expected.heading), 0, accuracy: 1e-7)
+                    }
+                    reference = trajectory.state(at: Double(phase.seconds))
+                }
+                XCTAssertEqual(session.elapsedSimulatedSeconds, 3_600, accuracy: 1e-6)
+            }
+        }
+    }
+
+    @MainActor
+    func testPauseZeroAirspeedAndMovementBeyondPresentationCrop() throws {
+        let wind = FlightConditions.steady(try XCTUnwrap(SteadyWind(fromDegrees: 270, speedKnots: 20)))
+        let initial = FlightAircraftState(normalizedPosition: CGPoint(x: 0.99, y: 0.5), speedKnots: 0)
+        let session = FlightSession(initialState: initial, conditions: wind)
+        session.selectedHeading = 90
+        session.advance(wallElapsed: 30)
+        XCTAssertEqual(session.aircraftState, initial)
+        XCTAssertEqual(session.elapsedSimulatedSeconds, 0)
+        session.isFlying = true
+        session.advance(wallElapsed: 3_600)
+        XCTAssertEqual(session.normalizedAircraftPosition.x, 1.03, accuracy: 1e-10)
+        XCTAssertEqual(session.heading, 90)
+        XCTAssertEqual(session.elapsedSimulatedSeconds, 3_600)
+        session.isFlying = false
+        let paused = session.aircraftState
+        session.advance(wallElapsed: 500)
+        XCTAssertEqual(session.aircraftState, paused)
+        XCTAssertEqual(session.elapsedSimulatedSeconds, 3_600)
+        let calm = FlightSession(initialState: initial)
+        calm.isFlying = true
+        calm.advance(wallElapsed: 10)
+        XCTAssertEqual(calm.normalizedAircraftPosition, initial.normalizedPosition)
+        XCTAssertEqual(calm.elapsedSimulatedSeconds, 10)
+    }
+
+    func testWindSetupRandomizesOnlyWhenRequestedAndRetainsEdits() throws {
+        var generator = WindTestGenerator()
+        var draft = MissionWindSetup()
+        XCTAssertEqual(draft.conditions, .calm)
+        XCTAssertEqual(generator.calls, 0)
+        draft.select(.steady, using: &generator)
+        XCTAssertTrue((0...359).contains(try XCTUnwrap(draft.direction)))
+        XCTAssertTrue((5...25).contains(try XCTUnwrap(draft.speed)))
+        let firstCalls = generator.calls
+        draft.directionText = "017"
+        draft.speedText = "40"
+        let edited = draft.conditions
+        draft.select(.calm, using: &generator)
+        XCTAssertEqual(draft.conditions, .calm)
+        draft.select(.steady, using: &generator)
+        XCTAssertEqual(draft.conditions, edited)
+        XCTAssertEqual(generator.calls, firstCalls)
+        draft.randomize(using: &generator)
+        XCTAssertGreaterThan(generator.calls, firstCalls)
+        XCTAssertTrue((5...25).contains(try XCTUnwrap(draft.speed)))
+    }
+
+    func testWindSetupRequiresCorrectionWithoutClampingOrErasingText() throws {
+        var draft = MissionWindSetup()
+        var generator = WindTestGenerator()
+        draft.select(.steady, using: &generator)
+        for invalid in ["", "360", "-1", "-0", "10.5", "east", "+5"] {
+            draft.directionText = invalid
+            draft.speedText = "20"
+            XCTAssertNil(draft.conditions)
+            draft.formatValidEntries()
+            XCTAssertEqual(draft.directionText, invalid)
+        }
+        draft.directionText = "359"
+        for invalid in ["", "41", "55", "-1", "1.5", "NaN"] {
+            draft.speedText = invalid
+            XCTAssertNil(draft.conditions)
+            draft.select(.calm, using: &generator)
+            XCTAssertEqual(draft.conditions, .calm)
+            draft.select(.steady, using: &generator)
+            XCTAssertEqual(draft.speedText, invalid)
+            XCTAssertNil(draft.conditions)
+        }
+        for speed in ["0", "40"] {
+            draft.speedText = speed
+            XCTAssertNotNil(draft.conditions)
+        }
+        draft.directionText = " 0 "
+        draft.formatValidEntries()
+        XCTAssertEqual(draft.directionText, "000")
+        XCTAssertNotNil(draft.conditions)
+    }
+
+    @MainActor
+    func testCompletionLocksConditionsAndRetryRestoresExplicitInitialState() throws {
+        let initial = FlightAircraftState(normalizedPosition: CGPoint(x: 0.35, y: 0.6), heading: 87, speedKnots: 120)
+        let mission = MissionFlightDefinition(id: "recovery", title: "Recover a route", initialState: initial,
+                                              plannedPoints: [MissionChartPoint(name: "Route start", normalizedPosition: .zero)])
+        var draft = MissionWindSetup()
+        draft.select(.steady)
+        draft.directionText = "270"
+        draft.speedText = "20"
+        let launched = try XCTUnwrap(draft.conditions)
+        let session = FlightSession(mission: mission, conditions: launched)
+        draft.select(.calm)
+        XCTAssertEqual(session.conditions, launched)
+        session.isFlying = true
+        session.selectedHeading = 180
+        session.advance(wallElapsed: 20)
+        session.nav1.obs = 123
+        session.zoom = 3
+        let result = try XCTUnwrap(session.completeMission())
+        XCTAssertNil(result.distanceFromDestinationNM)
+        XCTAssertEqual(result.conditions, launched)
+        XCTAssertEqual(result.aircraftState, session.aircraftState)
+        session.isFlying = true
+        XCTAssertFalse(session.isFlying)
+        session.advance(wallElapsed: 1_000)
+        XCTAssertEqual(session.completeMission(), result)
+        XCTAssertEqual(session.elapsedSimulatedSeconds, 20)
+        let retry = session.freshMissionSession()
+        XCTAssertEqual(retry.aircraftState, initial)
+        XCTAssertEqual(retry.selectedHeading, 87)
+        XCTAssertEqual(retry.conditions, launched)
+        XCTAssertEqual(retry.elapsedSimulatedSeconds, 0)
+        XCTAssertEqual(retry.nav1, NAVReceiver())
+        XCTAssertEqual(retry.zoom, 1)
+        XCTAssertNil(retry.completion)
+        XCTAssertTrue(MissionFlightProgress(instructionCount: 0).completedInstructionIndices.isEmpty)
+    }
+
+    @MainActor
+    func testInMemoryPlanAndDifferentMissionUseTheSameFlightPipeline() throws {
+        let authored = FlightPlan(id: "in-memory", name: "Eastbound test", origin: .airport(icao: "GNEW"),
+                                  waypoints: [], destination: .vor(stationID: "NEW"), terminalReference: nil)
+        let resolved = try FlightPlanResolver.resolve(authored,
+            airports: [makeAirport(icao: "GNEW", x: 0.2, y: 0.5)],
+            stations: [makeStation(identifier: "NEW", x: 0.4, y: 0.5)],
+            mapWidthNM: FlightWorld.widthNM, mapHeightNM: FlightWorld.heightNM, cruiseSpeedKnots: 120)
+        let first = MissionFlightDefinition(resolvedPlan: resolved)
+        XCTAssertEqual(first.plannedPoints.count, 2)
+        XCTAssertEqual(first.instructions.count, 1)
+        let other = MissionFlightDefinition(id: "other", title: "Other mission", initialState: first.initialState,
+            plannedPoints: [MissionChartPoint(name: "Elsewhere", normalizedPosition: CGPoint(x: 0.8, y: 0.8))],
+            arrivalReference: MissionChartPoint(name: "Different arrival", normalizedPosition: CGPoint(x: 0.3, y: 0.5)),
+            instructions: [MissionInstruction(title: "Find a fix"), MissionInstruction(title: "Recover")])
+        let wind = FlightConditions.steady(try XCTUnwrap(SteadyWind(fromDegrees: 90, speedKnots: 10)))
+        let a = FlightSession(mission: first, conditions: wind)
+        let b = FlightSession(mission: other, conditions: wind)
+        for session in [a, b] {
+            session.isFlying = true
+            session.selectedHeading = 90
+            session.advance(wallElapsed: 50)
+        }
+        XCTAssertEqual(a.aircraftState, b.aircraftState)
+        let aResult = try XCTUnwrap(a.completeMission())
+        let bResult = try XCTUnwrap(b.completeMission())
+        XCTAssertEqual(aResult.mission, first)
+        XCTAssertEqual(bResult.mission, other)
+        XCTAssertNotEqual(aResult.distanceFromDestinationNM, bResult.distanceFromDestinationNM)
+        XCTAssertEqual(b.freshMissionSession().mission, other)
+        let noReferences = MissionFlightDefinition(id: "no-reference", title: "Unplanned exercise", initialState: first.initialState)
+        let early = try XCTUnwrap(FlightSession(mission: noReferences, conditions: .calm).completeMission())
+        XCTAssertEqual(early.simulatedElapsedSeconds, 0)
+        XCTAssertNil(early.distanceFromDestinationNM)
+        XCTAssertTrue(early.mission.plannedPoints.isEmpty)
+    }
+
+    private struct WindTestGenerator: RandomNumberGenerator {
+        var calls = 0
+        var state: UInt64 = 42
+        mutating func next() -> UInt64 {
+            calls += 1
+            state = state &* 6_364_136_223_846_793_005 &+ 1
+            return state
         }
     }
 

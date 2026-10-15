@@ -30,6 +30,9 @@ private struct FlightDiagnosticsContent: View {
     var body: some View {
         Form {
             Section("Flight") {
+                LabeledContent("Conditions", value: session.conditions.label)
+                LabeledContent("Selected heading", value: String(format: "%.0f°", session.selectedHeading))
+                LabeledContent("Airspeed", value: String(format: "%.0f kt", session.speedKnots))
                 LabeledContent("Heading", value: String(format: "%.0f°", session.heading))
                 LabeledContent("Simulated time", value: String(format: "%.2f s", session.elapsedSimulatedSeconds))
             }
@@ -106,12 +109,13 @@ private struct FlightDiagnosticsMap: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let imageRect = FlatMap.fittedRect(in: geometry.size)
+            let crop = CGRect(x: 0, y: 0, width: 1, height: 1)
+            let imageRect = FlatMap.fittedRect(in: geometry.size, crop: crop)
             ZStack {
-                FlatMap(imageRect: imageRect)
+                FlatMap(imageRect: imageRect, crop: crop)
                 PlaneIcon(heading: session.heading)
                     .position(FlatMap.point(for: session.normalizedAircraftPosition,
-                                             in: imageRect))
+                                             in: imageRect, crop: crop))
                     .allowsHitTesting(false)
             }
             .frame(width: geometry.size.width, height: geometry.size.height)

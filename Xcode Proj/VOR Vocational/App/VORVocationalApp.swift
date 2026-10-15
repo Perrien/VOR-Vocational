@@ -27,6 +27,9 @@ struct VORVocationalApp: App {
                 Button("Flight Diagnostics") {
                     openWindow(id: "flight-diagnostics")
                 }
+                Button("Mission Runner Preview") {
+                    openWindow(id: "mission-runner-preview")
+                }
             }
         }
         #endif
@@ -35,6 +38,10 @@ struct VORVocationalApp: App {
         Window("Flight Diagnostics", id: "flight-diagnostics") {
             FlightDiagnosticsView()
                 .environment(diagnosticsStore)
+        }
+        Window("Mission Runner Preview", id: "mission-runner-preview") {
+            MissionRunnerPreviewView()
+                .frame(minWidth: 1100, minHeight: 760)
         }
         #endif
     }

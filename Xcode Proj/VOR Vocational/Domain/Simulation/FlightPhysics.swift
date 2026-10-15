@@ -1,9 +1,8 @@
 import CoreGraphics
 import Foundation
 
-/// Pure flight-movement math: no SwiftUI. Advances a position by heading and
-/// speed over an elapsed time, then clamps it to the map bounds.
-enum FlightPhysics {
+/// Pure flight math. Live motion uses a direct trajectory in physical NM.
+nonisolated enum FlightPhysics {
     /// The first-pass turn rate for the teaching simulation. The flight loop
     /// supplies simulated elapsed time, so playback speed scales the rate just
     /// as it scales aircraft movement.
@@ -20,11 +19,8 @@ enum FlightPhysics {
         let maximumTurn = max(0, turnRateDegreesPerSecond) * max(0, elapsed)
         guard maximumTurn > 0 else { return current }
 
-        var difference = target - current
-        if difference > 180 { difference -= 360 }
-        if difference < -180 { difference += 360 }
-
-        guard abs(difference) > maximumTurn else { return target }
+        let difference = signedHeadingDifference(from: current, to: target)
+        guard abs(difference) > maximumTurn + angularRoundoff else { return target }
         return normalizedHeading(current + (difference > 0 ? maximumTurn : -maximumTurn))
     }
 
@@ -50,9 +46,57 @@ enum FlightPhysics {
         )
     }
 
-    private static func normalizedHeading(_ heading: Double) -> Double {
+    static func normalizedHeading(_ heading: Double) -> Double {
         var normalized = heading.truncatingRemainder(dividingBy: 360)
         if normalized < 0 { normalized += 360 }
         return normalized
+    }
+
+    // Roundoff at the shared 0/180/360 boundaries must not reverse a turn when
+    // the same elapsed duration arrives in differently sized clock updates.
+    private static let angularRoundoff = 360 * Double.ulpOfOne * 8
+
+    private static func signedHeadingDifference(from current: Double, to target: Double) -> Double {
+        var difference = target - current
+        if abs(abs(difference) - 180) <= angularRoundoff { return 180 }
+        if difference > 180 { difference -= 360 }
+        if difference < -180 { difference += 360 }
+        return difference
+    }
+
+    /// One constant-control trajectory, evaluable at any simulated offset.
+    /// The arc integral uses a midpoint/sinc form to avoid cancellation during
+    /// very short turns. No frame subdivision or chart projection is involved.
+    struct Trajectory {
+        let start: FlightAircraftState
+        let selectedHeading: Double
+        let conditions: FlightConditions
+
+        func state(at elapsed: TimeInterval) -> FlightAircraftState {
+            precondition(elapsed.isFinite && elapsed >= 0)
+            let target = normalizedHeading(selectedHeading)
+            let difference = signedHeadingDifference(from: start.heading, to: target)
+            let turningTime = min(elapsed, abs(difference) / turnRateDegreesPerSecond)
+            let signedRate = (difference < 0 ? -1.0 : 1.0) * turnRateDegreesPerSecond * .pi / 180
+            let halfAngle = signedRate * turningTime / 2
+            let sinc = abs(halfAngle) < 1e-8
+                ? 1 - halfAngle * halfAngle / 6
+                : sin(halfAngle) / halfAngle
+            let midpointHeading = start.heading * .pi / 180 + halfAngle
+            let speed = start.speedKnots / 3_600
+            let heading = turn(heading: start.heading, toward: target, elapsed: elapsed)
+            let finalRadians = heading * .pi / 180
+            let straightTime = elapsed - turningTime
+            let wind = conditions.windVelocity
+            let origin = FlightWorld.nauticalMiles(for: start.normalizedPosition)
+            let position = CGPoint(
+                x: origin.x + speed * turningTime * sinc * sin(midpointHeading)
+                    + speed * straightTime * sin(finalRadians) + wind.x * elapsed,
+                y: origin.y - speed * turningTime * sinc * cos(midpointHeading)
+                    - speed * straightTime * cos(finalRadians) + wind.y * elapsed
+            )
+            return FlightAircraftState(normalizedPosition: FlightWorld.normalizedPosition(for: position),
+                                       heading: heading, speedKnots: start.speedKnots)
+        }
     }
 }

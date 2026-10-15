@@ -1,12 +1,13 @@
 import SwiftUI
 
-/// Read-only preflight reference for the supplied Silverkeep-to-Midland plan.
+/// Content adapter for the first supplied mission and its editable wind setup.
 /// It intentionally renders a static chart rather than a live flight surface.
 struct TransportBriefingView: View {
     var onMissions: () -> Void
     var onHome: () -> Void
 
-    @State private var isShowingTransportFlight = false
+    @State private var launchedConditions: FlightConditions?
+    @State private var windSetup = MissionWindSetup()
     private let content: TransportBriefingContent?
     private let loadError: String?
 
@@ -24,11 +25,11 @@ struct TransportBriefingView: View {
     }
 
     var body: some View {
-        if isShowingTransportFlight, let content {
-            TransportMissionView(
-                resolvedPlan: content.resolvedPlan,
-                briefing: content.briefing,
-                onBriefing: { isShowingTransportFlight = false },
+        if let launchedConditions, let content {
+            MissionFlightView(
+                mission: MissionFlightDefinition(resolvedPlan: content.resolvedPlan),
+                conditions: launchedConditions,
+                onBriefing: { self.launchedConditions = nil },
                 onMissions: onMissions,
                 onHome: onHome
             )
@@ -59,7 +60,8 @@ struct TransportBriefingView: View {
 
                 FlightPlanPanel(briefing: content.briefing,
                                 onMissions: onMissions,
-                                onStart: { isShowingTransportFlight = true })
+                                windSetup: $windSetup,
+                                onStart: { launchedConditions = $0 })
                     .frame(width: min(max(340, geometry.size.width * 0.34), 430))
             }
             .background(FlatMap.oceanColor)
@@ -127,7 +129,8 @@ private struct TransportBriefingContent {
 private struct FlightPlanPanel: View {
     let briefing: FlightPlanBriefing
     let onMissions: () -> Void
-    let onStart: () -> Void
+    @Binding var windSetup: MissionWindSetup
+    let onStart: (FlightConditions) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -146,24 +149,28 @@ private struct FlightPlanPanel: View {
                 .foregroundStyle(ControlPalette.secondaryText)
                 .padding(.bottom, 18)
 
-            summary
-
-            Divider().padding(.vertical, 18)
-
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+                    summary
+                    Divider()
+                    MissionWindSetupView(setup: $windSetup)
+                    Divider()
                     ForEach(Array(briefing.steps.enumerated()), id: \.offset) { index, step in
                         FlightPlanStepRow(number: index + 1, step: step)
                     }
                 }
             }
 
-            Button(action: onStart) {
+            Button {
+                guard let conditions = windSetup.conditions else { return }
+                onStart(conditions)
+            } label: {
                 Label("Fly Transport", systemImage: "airplane.departure")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .tint(ControlPalette.accent)
+            .disabled(windSetup.conditions == nil)
             .padding(.top, 14)
         }
         .padding(24)
@@ -236,5 +243,6 @@ private struct FlightPlanStepRow: View {
 
 #Preview {
     TransportBriefingView(onMissions: {}, onHome: {})
+        .environment(FlightDiagnosticsStore())
         .frame(width: 1100, height: 760)
 }

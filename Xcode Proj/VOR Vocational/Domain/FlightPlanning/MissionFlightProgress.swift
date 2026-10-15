@@ -9,7 +9,7 @@ nonisolated struct MissionFlightProgress: Equatable {
     private(set) var completedInstructionIndices: Set<Int> = []
 
     init(instructionCount: Int) {
-        precondition(instructionCount > 0, "A mission needs at least one instruction.")
+        precondition(instructionCount >= 0, "Instruction count must be non-negative.")
         self.instructionCount = instructionCount
     }
 
@@ -31,8 +31,30 @@ nonisolated struct MissionFlightProgress: Equatable {
 /// flight complete. It reports raw distance from the destination; it does not
 /// decide whether the player arrived successfully.
 nonisolated struct MissionFlightCompletion: Equatable {
+    let mission: MissionFlightDefinition
+    let aircraftState: FlightAircraftState
+    let conditions: FlightConditions
     let simulatedElapsedSeconds: TimeInterval
-    let distanceFromDestinationNM: Double
+    let distanceFromDestinationNM: Double?
+
+    init(mission: MissionFlightDefinition, aircraftState: FlightAircraftState,
+         conditions: FlightConditions, simulatedElapsedSeconds: TimeInterval,
+         mapWidthNM: Double = FlightWorld.widthNM, mapHeightNM: Double = FlightWorld.heightNM) {
+        precondition(simulatedElapsedSeconds.isFinite && simulatedElapsedSeconds >= 0,
+                     "Simulated elapsed time must be finite and non-negative.")
+        precondition(mapWidthNM.isFinite && mapWidthNM > 0 &&
+                     mapHeightNM.isFinite && mapHeightNM > 0,
+                     "Mission map dimensions must be finite and greater than zero.")
+        self.mission = mission
+        self.aircraftState = aircraftState
+        self.conditions = conditions
+        self.simulatedElapsedSeconds = simulatedElapsedSeconds
+        distanceFromDestinationNM = mission.arrivalReference.map {
+            VORNavigation.distanceNM(fromNormalized: aircraftState.normalizedPosition,
+                                     toNormalized: $0.normalizedPosition,
+                                     mapWidthNM: mapWidthNM, mapHeightNM: mapHeightNM)
+        }
+    }
 
     init(
         resolvedPlan: ResolvedFlightPlan,
@@ -41,21 +63,9 @@ nonisolated struct MissionFlightCompletion: Equatable {
         mapWidthNM: Double,
         mapHeightNM: Double
     ) {
-        precondition(simulatedElapsedSeconds.isFinite && simulatedElapsedSeconds >= 0,
-                     "Simulated elapsed time must be finite and non-negative.")
-        precondition(mapWidthNM.isFinite && mapWidthNM > 0 &&
-                     mapHeightNM.isFinite && mapHeightNM > 0,
-                     "Mission map dimensions must be finite and greater than zero.")
-        guard let destination = resolvedPlan.points.last else {
-            preconditionFailure("A resolved mission plan needs a destination.")
-        }
-
-        self.simulatedElapsedSeconds = simulatedElapsedSeconds
-        distanceFromDestinationNM = VORNavigation.distanceNM(
-            fromNormalized: aircraftPosition,
-            toNormalized: destination.normalizedPosition,
-            mapWidthNM: mapWidthNM,
-            mapHeightNM: mapHeightNM
-        )
+        self.init(mission: MissionFlightDefinition(resolvedPlan: resolvedPlan),
+                  aircraftState: FlightAircraftState(normalizedPosition: aircraftPosition),
+                  conditions: .calm, simulatedElapsedSeconds: simulatedElapsedSeconds,
+                  mapWidthNM: mapWidthNM, mapHeightNM: mapHeightNM)
     }
 }

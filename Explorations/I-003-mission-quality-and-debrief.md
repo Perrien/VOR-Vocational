@@ -1,14 +1,18 @@
 # I-003 — Mission quality and debrief
 
-**Status:** Ready to plan — wind, recording, and first unscored debrief
+**Status:** Stage 1 implemented and behavior-verified; owner review pending
 
 **Idea:** [I-003 in IDEAS.md](../IDEAS.md#i-003--mission-quality-and-debrief)
+
+**Build plan:** [Wind, flight recording, and first debrief](../Plans/I-003-Wind-Recording-Debrief.md). The plan resolves the engineering details identified below and defines implementation stages and owner checkpoints.
 
 **Current focus:** Steady wind, flight recording, and an unscored planned-versus-flown debrief. Scoring design follows after these can be tried with real flights.
 
 ## Purpose and scope
 
 Extend the working Silverkeep Strip → Midland Cityport Transport mission so the player can experience wind affecting navigation and inspect the flight they actually flew against the assigned route after the flight ends.
+
+**Owner clarification, 2026-10-15:** This route is the first test mission. Wind, simulation, recording, ending, and debrief must be shared capabilities for other authored and generated missions. Mission identity, starting state, route geometry, instructions, and any arrival reference are supplied as data; none of these capabilities may depend on the Transport mission, its airports, or its bundle resource. The active plan defines that reusable contract and verifies it with alternative in-memory mission inputs. A generator and additional production missions remain separate work.
 
 Explore wind, recording, and the first debrief together because the conditions that move the aircraft must agree with the recorded path and its explanation. Implementation can have separate user-visible landmarks without separating their design.
 
@@ -191,9 +195,11 @@ The existing initiative records route tracking and arrival accuracy as separate 
 - No dependency, project-file, signing, capability, entitlement, or bundle-ID changes are assumed.
 - No executable build plan or production changes are part of this exploration.
 
-## Current app and implications
+## App baseline used for planning
 
-The source agrees with the README about the current mission:
+This section records the pre-implementation baseline. Stage 1 has since delivered wind and shared model-owned movement; see the active plan and README for current behavior.
+
+The source agreed with the README about the current mission:
 
 - The briefing resolves the bundled route into six chart points and five player-facing NAV instructions. Its distance and time estimate are explicitly still-air planning information.
 - The mission has a scrollable, collapsible instruction checklist and manual Flight Complete. The player can complete with any combination of checked instructions.
@@ -211,13 +217,13 @@ The earlier reference material in `Design/` assumes an active leg for route scor
 - The **flight model** owns aircraft movement, simulated elapsed time, recording, and mission-ending state together. The chart displays that state.
 - Chart crop, layout size, camera zoom, and camera pan are presentation inputs; they do not define the physical movement calculation or the mission's full-chart exit boundary.
 - Flight calculations use the existing Myosia calibration consistently for movement, receiver readings, recorded positions, and destination distance. Bundled chart or route coordinates do not need to be rewritten.
-- The briefing owns editable setup. A launched flight receives its fixed wind conditions and the resolved supplied route. Checklist assists remain independent of flight recording and assessment.
+- The briefing owns editable setup. A launched flight receives its fixed wind conditions and a mission definition, adapted from the resolved supplied route for the first test mission. Other authored and generated missions use the same input contract and shared implementation. Checklist assists remain independent of flight recording and assessment.
 - Either ending path must freeze one coherent completed result: the flown recording, wind conditions, final position, simulated elapsed time, and ending reason. The debrief reads that completed result rather than continuing to observe mutable flight movement.
 - This requires a focused refactor from the current view-owned movement loop. Direct motion calculation is settled; tick delivery, numerical verification criteria, and the details of the crossing solver remain to be resolved.
 
-## Details to resolve in the build plan
+## Engineering handoff to the build plan
 
-The purpose, scope, major responsibilities, wind interaction, recording requirements, and first debrief experience are settled enough to plan. The following details remain explicit planning work rather than new product-scope questions:
+The purpose, scope, major responsibilities, wind interaction, recording requirements, and first debrief experience were settled by this exploration. The following details were handed off as engineering work rather than new product-scope questions; their decisions are now recorded in the linked build plan:
 
 1. **Numerical verification and clock delivery:** Choose the tick-delivery and boundary-crossing algorithms, then state numerical acceptance criteria for direct motion, scheduled sample positions, and the first crossing's position/time. Verify equivalent simulated input histories across playback speeds. Include a curved trajectory that crosses a boundary within an advance even if its later position would be inside again; checking only the advance's endpoint is insufficient. Existing test tolerances and world/route data remain unchanged.
 2. **Recording representation and coincident events:** Retain positions with the existing source-chart calibration. Specify the representation and treatment of coincident regular/finish or start/finish samples so the exact ending state is authoritative, timestamps stay coherent, and the debrief does not fabricate a flown segment. Manual Flight Complete remains available before movement, preserving a zero-time result at the origin with the ordinary direct distance from Midland.
@@ -237,7 +243,7 @@ These are user-visible outcomes and their dependencies, not implementation tasks
 
 ## Planning handoff
 
-The next explicit command is **`a-plan I-003`**, using this file as the source of settled requirements. Plan the wind, recording, and first unscored debrief slice, with useful owner checkpoints for navigating in wind and then inspecting the completed flight. Make the remaining engineering and visual details above concrete in that plan.
+The [active build plan](../Plans/I-003-Wind-Recording-Debrief.md) now turns these settled requirements into three implementation stages: navigating with steady wind, inspecting a recorded flight in a first working debrief, and completing pan/zoom and visual verification. Stage 1 is implemented and behavior-verified. Stop at its owner review/commit checkpoint before Stage 2.
 
 Scoring remains a separate later exploration within I-003, informed by the resulting flight evidence. The 35% / 65% proposal is preserved for that discussion and must not become a score in the first slice. Checkmarks remain excluded from assessment throughout.
 

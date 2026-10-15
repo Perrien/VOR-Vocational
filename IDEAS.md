@@ -2,17 +2,19 @@
 
 Each entry is one individually addressable idea. Refer to its ID—for example, “explore `I-003`,” “explore `I-005`,” or “delete `I-006`.” IDs never change or get reused. The status sections make the list easy to scan; they do not turn a collection of ideas into a project history.
 
-## Ready to plan
+## Active
 
 ### I-003 — Mission quality and debrief
 
-**Status:** Ready to plan
+**Status:** Stage 1 implemented and behavior-verified — awaiting owner visual review and commit decision
 **Type:** Initiative
-**Next action:** `a-plan I-003` for wind, recording, and the first unscored debrief
+**Next action:** Try and review Stage 1, then choose whether to commit before Stage 2 (recording and first debrief)
 
-**What it is:** Offer Calm or randomly populated, editable Steady wind, record the supplied mission's flown path, and show an unscored planned-versus-flown debrief on Flight Complete or flying off the map. Instruction checkmarks remain player assists and never affect scoring.
+**What it is:** Shared mission wind, flight recording, ending, and unscored planned-versus-flown debrief capabilities for authored and generated missions. Silverkeep → Midland is the first test integration. Offer Calm or randomly populated, editable Steady wind; show the debrief on Flight Complete or flying off the map. Mission identity, starting state, route, instructions, and any arrival reference are inputs. Instruction checkmarks remain player assists and never affect scoring.
 
 **Exploration:** [Wind, recording, and first debrief design](Explorations/I-003-mission-quality-and-debrief.md)
+
+**Build plan:** [Wind, flight recording, and first debrief](Plans/I-003-Wind-Recording-Debrief.md)
 
 ## Later
 

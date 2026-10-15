@@ -55,17 +55,24 @@ struct NAVReceiver: Equatable {
 @Observable
 final class FlightSession {
     var normalizedAircraftPosition: CGPoint
-    /// The aircraft's current, physical direction of travel.
+    /// Nose heading; wind can make the ground track differ.
     var heading: Double = 0
     /// The heading selected with the heading knob. The aircraft turns toward
     /// this target at the simulation's bounded turn rate.
     var selectedHeading: Double = 0
     var speedKnots: Double = 260
-    var isFlying = false
+    private var flightIsPlaying = false
+    var isFlying: Bool {
+        get { flightIsPlaying && completion == nil }
+        set { flightIsPlaying = newValue && completion == nil }
+    }
     var timeMultiplier: Double = 1
     /// Elapsed simulation time, including the selected playback multiplier.
     /// A mission completion records this value; it is not a score or ETA.
-    var elapsedSimulatedSeconds: TimeInterval = 0
+    private(set) var elapsedSimulatedSeconds: TimeInterval = 0
+    let conditions: FlightConditions
+    let mission: MissionFlightDefinition?
+    private(set) var completion: MissionFlightCompletion?
     var nav1 = NAVReceiver()
     var nav2 = NAVReceiver()
 
@@ -82,8 +89,61 @@ final class FlightSession {
     var selectedVORID: String?
     var cdiMax: Double = 10
 
-    init(normalizedAirportPosition: CGPoint) {
-        normalizedAircraftPosition = normalizedAirportPosition
+    init(initialState: FlightAircraftState, conditions: FlightConditions = .calm,
+         mission: MissionFlightDefinition? = nil) {
+        normalizedAircraftPosition = initialState.normalizedPosition
+        heading = initialState.heading
+        selectedHeading = initialState.heading
+        speedKnots = initialState.speedKnots
+        self.conditions = conditions
+        self.mission = mission
+    }
+
+    convenience init(normalizedAirportPosition: CGPoint) {
+        self.init(initialState: FlightAircraftState(normalizedPosition: normalizedAirportPosition))
+    }
+
+    convenience init(mission: MissionFlightDefinition, conditions: FlightConditions) {
+        self.init(initialState: mission.initialState, conditions: conditions, mission: mission)
+    }
+
+    var aircraftState: FlightAircraftState {
+        FlightAircraftState(normalizedPosition: normalizedAircraftPosition,
+                            heading: heading, speedKnots: speedKnots)
+    }
+
+    /// The only live advancement entry point. Pause/completion guard stale ticks.
+    func advance(wallElapsed: TimeInterval) {
+        guard isFlying, completion == nil, wallElapsed.isFinite, wallElapsed > 0,
+              timeMultiplier.isFinite, timeMultiplier > 0,
+              heading.isFinite, selectedHeading.isFinite,
+              speedKnots.isFinite, speedKnots >= 0 else { return }
+        let elapsed = wallElapsed * timeMultiplier
+        guard elapsed.isFinite else { return }
+        let trajectory = FlightPhysics.Trajectory(start: aircraftState,
+                                                 selectedHeading: selectedHeading,
+                                                 conditions: conditions)
+        let next = trajectory.state(at: elapsed)
+        normalizedAircraftPosition = next.normalizedPosition
+        heading = next.heading
+        elapsedSimulatedSeconds += elapsed
+    }
+
+    @discardableResult
+    func completeMission() -> MissionFlightCompletion? {
+        if let completion { return completion }
+        guard let mission else { return nil }
+        isFlying = false
+        let result = MissionFlightCompletion(mission: mission, aircraftState: aircraftState,
+                                             conditions: conditions,
+                                             simulatedElapsedSeconds: elapsedSimulatedSeconds)
+        completion = result
+        return result
+    }
+
+    func freshMissionSession() -> FlightSession {
+        guard let mission else { preconditionFailure("Retry requires a mission definition.") }
+        return FlightSession(mission: mission, conditions: conditions)
     }
 
     func swapNAVReceivers() {
