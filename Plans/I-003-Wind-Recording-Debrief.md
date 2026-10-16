@@ -1,12 +1,12 @@
 # I-003 — Wind, flight recording, and first debrief
 
-**Status:** Stage 2 implemented and behavior-verified — awaiting owner review
+**Status:** Stages 1–2 committed; Stage 3 implemented — final owner review pending
 
 **Idea:** [I-003 in IDEAS.md](../IDEAS.md#i-003--mission-quality-and-debrief)
 
 **Requirements:** [Settled exploration](../Explorations/I-003-mission-quality-and-debrief.md)
 
-**Current checkpoint:** Stage 2 — Inspect the completed flight; owner visual review and commit decision pending
+**Current checkpoint:** Stage 3 — Interactive debrief inspection; final owner review and commit decision pending
 
 ## Outcome and boundaries
 
@@ -476,7 +476,7 @@ pending. Stage 2 below now delivers them.
 
 ### Stage 2 — Record the flight and show a first working debrief
 
-**State:** Implemented and behavior-verified; awaiting owner visual review and commit decision
+**State:** Accepted and committed as `c6f62f7`; owner authorized Stage 3
 
 - [x] Add the sample schedule and exact start/finish rules to all mission
   sessions. Complete the immutable result and idempotent ending lifecycle.
@@ -586,12 +586,11 @@ commit **before Stage 3**. Suggested commit:
 
 **Owner checkpoint**
 
-- [ ] Review the planned/flown comparison, markers, legend, reason, measurements,
-  and actions at 1100×760. Capture initially returned a blank preview; activating
-  the verified app through Finder produced a Stage Manager thumbnail showing
-  both routes and the full edge track, but full-size readability could not be
-  confirmed. Do not mark this as final visual acceptance.
-- [ ] Choose whether to commit Stage 2 before Stage 3 implementation.
+- [x] Owner accepted the functional Stage 2 checkpoint by committing and
+  requesting continuation. Final visual acceptance carried forward to Stage 3:
+  the initial capture showed only a Stage Manager thumbnail, so full-size
+  readability was not claimed at this checkpoint.
+- [x] Owner committed Stage 2 as `c6f62f7` and requested continuation.
 
 **Try it:** The verified app is open on a completed northbound wind flight.
 Use Fly Again to start a new recording with the same conditions; Flight Complete
@@ -603,32 +602,32 @@ flight automatically; pan/zoom and Fit Flight are deliberately still pending.
 
 ### Stage 3 — Finish debrief inspection and visual verification
 
-**State:** Not started; depends on Stage 2's owner checkpoint
+**State:** Implemented; verification and final owner checkpoint recorded below
 
-- [ ] Add pan/zoom and **Fit Flight**, operating solely on a debrief-local
+- [x] Add pan/zoom and **Fit Flight**, operating solely on a debrief-local
   camera. On opening and on Fit Flight, fit the union of all planned points
   and recorded positions with at least 48 points of screen margin per side.
   Include marker/label extents; handle one-point/stationary tracks without
   zero-sized bounds. A missing planned route fits the flown path alone.
   Fit on layout-size changes using the same snapshot.
-- [ ] Use a physical source-space projection with the original aspect ratio.
+- [x] Use a physical source-space projection with the original aspect ratio.
   Letterbox with ocean as needed. Do not reuse the live cropped projection
   or crop-bound pan constraints in a way that hides any of the flight.
-- [ ] Start at the fitted scale. Allow zoom from 0.5× to 16× that scale,
+- [x] Start at the fitted scale. Allow zoom from 0.5× to 16× that scale,
   anchored at the pointer, and pan far enough to inspect every full-source
   edge. Fit Flight resets pan and zoom. Keep stroke widths and marker sizes
   readable in screen points; no gestures alter recorded data.
-- [ ] Start visual review with an **orange dashed 3-point planned route** and
+- [x] Start visual review with an **orange dashed 3-point planned route** and
   a **dark blue solid 3-point flown path**, each with a contrasting halo, plus
   a legend using the same line styles, omitting planned-route legend items when
   no planned route is supplied. Distinguish Start, any named arrival reference,
   and Finish by shape and label as well as colour. Offset overlapping labels;
   show combined start/finish meaning for a zero-time flight, without a fake
   segment. Visual tuning may change colour/spacing, never recording geometry.
-- [ ] Use a summary beside the chart, approximately 340–400 points wide and
+- [x] Use a summary beside the chart, approximately 340–400 points wide and
   scrollable when necessary. Keep reason, conditions, measurements, and all
   actions reachable at 1100×760. This screen contains no live cockpit.
-- [ ] Test pure fit/projection calculations for full-source edge tracks,
+- [x] Test pure fit/projection calculations for full-source edge tracks,
   stationary flights, aspect ratio, and route-plus-track containment. Verify
   camera actions leave the snapshot unchanged; do not add tests that merely
   duplicate colour/style literals.
@@ -637,7 +636,7 @@ flight automatically; pan/zoom and Fit Flight are deliberately still pending.
   overlapping markers, alternative mission inputs, and window resizing in the
   running app. Recheck normal
   mission truth hiding and the other two working modes.
-- [ ] Update README with the final experience and actual limitations, and
+- [x] Update README with the final experience and actual limitations, and
   update I-003 so later scoring exploration is the next action. Retain the
   exploration and its deferred weighting proposal.
 
@@ -650,6 +649,76 @@ record any visual review still needing owner acceptance explicitly.
 to commit. Suggested commit: `Finish interactive mission debrief inspection`.
 After owner acceptance of the final stage, mark the plan complete and move it
 to `Plans/Archived/`, updating inbound links in the same documentation change.
+
+**Verification result — 2026-10-15**
+
+- Full macOS suite: **57 tests passed, 0 failures**. This includes the Debug
+  build with existing signing and configuration. Final result:
+  `/tmp/VOR-I003-DerivedData/Logs/Test/Test-VOR Vocational-2026.10.15_22-01-24--0500.xcresult`.
+- Final Release build: **BUILD SUCCEEDED** using the command above with
+  `build -configuration Release`. The running Release app's Window menu has
+  neither Flight Diagnostics nor Mission Runner Preview; its executable also
+  contains none of their view names/command strings. No dependency, project,
+  signing, bundled-data, fixture, or existing tolerance changes.
+- The camera stores only relative zoom and screen pan. Pointer-anchor tests
+  pass after prior panning and when either zoom limit clamps the request.
+  A stationary fit near one source corner can pan all four source corners to
+  the screen centre at 0.5×, 1×, and 16×. Physical chart aspect is preserved.
+- Different landscape/portrait fit sizes contain the complete supplied route,
+  recording, and optional arrival reference. Fit Flight resets both zoom and
+  pan. Recorded timestamps, positions, conditions, and ending stay unchanged.
+  Camera projection checks meet 1e-8 screen points; existing numeric criteria
+  remain unchanged.
+- Three coincident symbols/labels at every fitted corner and at the centre
+  stay separated, within the 48-point margin, and clear of the Home, zoom/Fit,
+  and legend regions. Labels wrap to a bounded screen width; displaced symbols
+  have a leader to a dot at the exact chart position. Path geometry is unchanged.
+- In the app, drag panning and scroll-wheel zoom worked. The zoom buttons
+  reached 0.5× and 16× with the corresponding button disabled at each limit.
+  Fit Flight restored 1×; resizing from a 16× view also restored the fitted
+  camera while retaining the same completed sample count and measurements.
+- Entering full screen resolved the Stage Manager capture limitation for the
+  main window. Full-resolution review confirmed readable planned/flown styles,
+  contrasting halos, matching legend, marker labels, summary/actions, and no
+  cockpit. Zero-time completion showed combined Start / Finish. A final short
+  Calm flight showed **9 samples, 0:00:08, 89.44 NM**; near-coincident Start and
+  Finish remained distinct with separated labels and a leader to the finish.
+- A northbound 260-kt flight with Wind from 270° at 20 kt and 30× playback was
+  paused at **0:21:29**, then resumed. It automatically ended at the full north
+  edge with **2,981 samples, 0:49:40, 255.97 NM**, matching Stage 2's independent
+  exit reference. The fitted view showed the entire dark blue track beyond the
+  live crop alongside the complete orange planned route. The completed values
+  remained frozen through inspection.
+- The alternate mission used 1×, 5×, 10×, and 30× in one recording, then paused
+  and completed. Its shared debrief reported **262 samples, two planned points,
+  0:04:21, Wind from 180° at 15 kt, 98.51 NM from Survey endpoint**. It uses its
+  own names and geometry without a first-mission branch. Its window capture
+  remained blank; its content/actions were checked through accessibility.
+- Normal mission play still showed neither the true aircraft marker nor the
+  planned route. In Release, Free Flight retained its marker and working
+  Play/Pause; Position Challenge retained its stationary guess flow and
+  separate error result (147.6 NM in the exercised random challenge), without
+  a flight playback row or mission debrief.
+- `git diff --check` passed. The only build warnings were the existing weak
+  test-variable suggestion and skipped App Intents metadata extraction.
+
+**Final owner checkpoint**
+
+- [ ] Review the normal **1100×760** layout, including scrolling and all return
+  actions, and inspect the debrief of a flight with a deliberate route
+  correction. Full-resolution tool captures were available in full screen;
+  exact minimum-window visual acceptance and that corrected-route review are
+  still owner checks. The underlying turning/recording cases pass the suite.
+- [ ] Choose whether to commit Stage 3. Do not archive the plan until accepted.
+
+**Try it:** The final Debug app at
+`/tmp/VOR-I003-DerivedData/Build/Products/Debug/VOR Vocational.app` is open on
+the short Calm-flight debrief. Drag the chart, scroll around a point of
+interest, use the zoom buttons, then Fit Flight. Resize to the minimum window
+and check the summary/actions. Fly Again starts a clean recording; Back to
+Briefing lets you choose wind. Later scoring exploration is the next feature
+work after acceptance; this plan still adds no grade, weighting, replay,
+sample inspection, or saved history.
 
 ## Verification commands and stopping rules
 
@@ -689,4 +758,4 @@ never widen an existing tolerance or move a fixture to obtain a pass.
   debrief mandatory for authored and generated missions, with reuse checks.
 - Checked whitespace and all 11 local document links; no missing targets.
 - App tests were not run for this documentation-only change.
-- Stage 1 is accepted and committed as `76f44b7`. Stage 2 evidence is recorded above; its owner checkpoint and Stage 3 remain pending.
+- Stage 1 is accepted and committed as `76f44b7`; Stage 2 is committed as `c6f62f7`. Stage 3's final owner checkpoint remains pending.

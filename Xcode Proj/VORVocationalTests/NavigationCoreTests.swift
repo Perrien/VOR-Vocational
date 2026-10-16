@@ -1317,6 +1317,112 @@ final class NavigationCoreTests: XCTestCase {
         XCTAssertNil(try tangent.firstChartExit(through: 60))
     }
 
+    func testDebriefZoomKeepsPointerAnchorAcrossLimitsAndPriorPan() {
+        let size = CGSize(width: 725, height: 760)
+        let fit = MissionChartProjection(positions: [CGPoint(x: 0.2, y: 0.4), CGPoint(x: 0.9, y: 0.6)], size: size)
+        let pointer = CGPoint(x: 173, y: 541)
+        var camera = MissionDebriefCamera()
+        camera.move(by: CGSize(width: 117, height: -93))
+        let fixedPosition = fit.applying(camera).position(at: pointer)
+        for factor: CGFloat in [2, 3, 100, 0.25, 0.001, 1.7] {
+            camera.zoom(by: factor, anchoredAt: pointer, in: size)
+            assertPoint(fit.applying(camera).point(for: fixedPosition), equals: pointer, accuracy: 1e-9)
+            XCTAssertTrue((0.5...16).contains(camera.zoom))
+        }
+        camera.zoom(by: 1_000, anchoredAt: pointer, in: size)
+        XCTAssertEqual(camera.zoom, 16)
+        camera.zoom(by: 0.00001, anchoredAt: pointer, in: size)
+        XCTAssertEqual(camera.zoom, 0.5)
+        camera.fitFlight()
+        XCTAssertEqual(camera, MissionDebriefCamera())
+        assertPoint(fit.applying(camera).point(for: fixedPosition), equals: fit.point(for: fixedPosition))
+    }
+
+    func testDebriefCanPanEveryFullSourceEdgeIntoViewAtAnyZoom() {
+        let size = CGSize(width: 725, height: 760)
+        // Fit a tiny flight near one corner: the other edges start far offscreen.
+        let fit = MissionChartProjection(positions: [CGPoint(x: 0.99, y: 0.01)], size: size)
+        let center = CGPoint(x: size.width / 2, y: size.height / 2)
+        for zoom: CGFloat in [0.5, 1, 16] {
+            for edge in [CGPoint.zero, CGPoint(x: 1, y: 0), CGPoint(x: 0, y: 1), CGPoint(x: 1, y: 1)] {
+                var camera = MissionDebriefCamera()
+                camera.zoom(by: zoom, anchoredAt: center, in: size)
+                let point = fit.applying(camera).point(for: edge)
+                camera.move(by: CGSize(width: center.x - point.x, height: center.y - point.y))
+                let projected = fit.applying(camera)
+                assertPoint(projected.point(for: edge), equals: center, accuracy: 1e-8)
+                XCTAssertEqual(projected.sourceImageRect.width / projected.sourceImageRect.height,
+                               FlightWorld.sourceAspect, accuracy: 1e-10)
+            }
+        }
+    }
+
+    func testDebriefFitsDifferentLayoutsWithoutChangingCompletedSnapshot() {
+        let initial = FlightAircraftState(normalizedPosition: CGPoint(x: 0, y: 0.9), heading: 90, speedKnots: 120)
+        let mission = MissionFlightDefinition(id: "generated", title: "Another mission", initialState: initial,
+            plannedPoints: [MissionChartPoint(name: "Route origin", normalizedPosition: CGPoint(x: 0.1, y: 0.1)),
+                            MissionChartPoint(name: "Route end", normalizedPosition: CGPoint(x: 1, y: 0.5))],
+            arrivalReference: MissionChartPoint(name: "Arrival reference", normalizedPosition: CGPoint(x: 0.4, y: 1)))
+        let completion = MissionFlightCompletion(mission: mission,
+            recording: [FlightSample(simulatedSeconds: 0, aircraftState: initial),
+                        FlightSample(simulatedSeconds: 123.456,
+                            aircraftState: FlightAircraftState(normalizedPosition: CGPoint(x: 0.2, y: 0), heading: 80, speedKnots: 120))],
+            conditions: .calm, ending: .playerCompleted)
+        let saved = completion
+        let positions = completion.recording.map { $0.aircraftState.normalizedPosition }
+            + completion.mission.plannedPoints.map(\.normalizedPosition)
+            + [completion.mission.arrivalReference!.normalizedPosition]
+        var camera = MissionDebriefCamera()
+        for size in [CGSize(width: 725, height: 760), CGSize(width: 1_100, height: 900), CGSize(width: 760, height: 1_000)] {
+            camera.fitFlight() // The view resets on layout changes, using these same values.
+            let fitRect = CGRect(x: 64, y: 104, width: size.width - 128, height: size.height - 208)
+            let fit = MissionChartProjection(positions: positions, size: size, fitRect: fitRect)
+            for position in positions {
+                let point = fit.applying(camera).point(for: position)
+                XCTAssertGreaterThanOrEqual(point.x, fitRect.minX - 1e-9)
+                XCTAssertLessThanOrEqual(point.x, fitRect.maxX + 1e-9)
+                XCTAssertGreaterThanOrEqual(point.y, fitRect.minY - 1e-9)
+                XCTAssertLessThanOrEqual(point.y, fitRect.maxY + 1e-9)
+            }
+            camera.zoom(by: 4, anchoredAt: CGPoint(x: 90, y: 190), in: size)
+            camera.move(by: CGSize(width: -900, height: 700))
+            XCTAssertEqual(completion, saved)
+            camera.fitFlight()
+            XCTAssertEqual(camera.zoom, 1)
+            XCTAssertEqual(camera.pan, .zero)
+            XCTAssertEqual(completion.recording.last?.simulatedSeconds, 123.456)
+        }
+    }
+
+    func testDebriefCoincidentAndEdgeLabelsStaySeparateAndInsideMargin() {
+        let bounds = CGRect(x: 48, y: 48, width: 629, height: 664)
+        let controls = [CGRect(x: 16, y: 40, width: 100, height: 44),
+                        CGRect(x: 485, y: 40, width: 224, height: 44),
+                        CGRect(x: 16, y: 696, width: 230, height: 48)]
+        for anchor in [CGPoint(x: 64, y: 104), CGPoint(x: 661, y: 104),
+                       CGPoint(x: 64, y: 656), CGPoint(x: 661, y: 656), CGPoint(x: 350, y: 380)] {
+            let inputs = [CGSize(width: 50, height: 22), CGSize(width: 60, height: 22), CGSize(width: 180, height: 36)]
+                .map { MissionDebriefMarkerLayout.Input(anchor: anchor, labelSize: $0) }
+            let placements = MissionDebriefMarkerLayout.place(inputs, in: bounds, avoiding: controls)
+            XCTAssertEqual(placements.count, 3)
+            for (index, placement) in placements.enumerated() {
+                XCTAssertTrue(bounds.contains(placement.labelRect))
+                XCTAssertFalse(controls.contains { $0.intersects(placement.labelRect) })
+                XCTAssertTrue(bounds.contains(CGRect(x: placement.symbolCenter.x - 10,
+                                                     y: placement.symbolCenter.y - 10, width: 20, height: 20)))
+                for other in placements.dropFirst(index + 1) {
+                    XCTAssertFalse(placement.labelRect.intersects(other.labelRect))
+                    XCTAssertGreaterThanOrEqual(hypot(placement.symbolCenter.x - other.symbolCenter.x,
+                                                     placement.symbolCenter.y - other.symbolCenter.y), 24)
+                }
+                for other in placements {
+                    XCTAssertFalse(placement.labelRect.intersects(CGRect(x: other.symbolCenter.x - 10,
+                                                                        y: other.symbolCenter.y - 10, width: 20, height: 20)))
+                }
+            }
+        }
+    }
+
     private struct WindTestGenerator: RandomNumberGenerator {
         var calls = 0
         var state: UInt64 = 42

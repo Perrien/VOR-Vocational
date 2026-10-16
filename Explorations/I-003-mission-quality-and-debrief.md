@@ -1,12 +1,12 @@
 # I-003 — Mission quality and debrief
 
-**Status:** Stage 1 committed; Stage 2 implemented and behavior-verified, owner review pending
+**Status:** Stages 1–2 committed; Stage 3 interactive debrief implemented, final owner review pending
 
 **Idea:** [I-003 in IDEAS.md](../IDEAS.md#i-003--mission-quality-and-debrief)
 
 **Build plan:** [Wind, flight recording, and first debrief](../Plans/I-003-Wind-Recording-Debrief.md). The plan resolves the engineering details identified below and defines implementation stages and owner checkpoints.
 
-**Current focus:** Steady wind, flight recording, and an unscored planned-versus-flown debrief. Scoring design follows after these can be tried with real flights.
+**Current focus:** Final owner review of steady wind, flight recording, and the interactive unscored planned-versus-flown debrief. Scoring design follows acceptance; the deferred weighting below remains a proposal.
 
 ## Purpose and scope
 
@@ -243,7 +243,7 @@ These are user-visible outcomes and their dependencies, not implementation tasks
 
 ## Planning handoff
 
-The [active build plan](../Plans/I-003-Wind-Recording-Debrief.md) now turns these settled requirements into three implementation stages: navigating with steady wind, inspecting a recorded flight in a first working debrief, and completing pan/zoom and visual verification. Stage 1 is accepted and committed as `76f44b7`. Stage 2 is implemented and behavior-verified; stop at its owner review/commit checkpoint before Stage 3.
+The [active build plan](../Plans/I-003-Wind-Recording-Debrief.md) turns these settled requirements into three implementation stages: navigating with steady wind, inspecting a recorded flight in a first working debrief, and completing pan/zoom and visual verification. Stages 1 and 2 are committed as `76f44b7` and `c6f62f7`. Stage 3 is implemented and awaiting final owner review/commit. After acceptance, archive the plan and explore scoring against recorded flights; no weighting or grade has been implemented.
 
 Scoring remains a separate later exploration within I-003, informed by the resulting flight evidence. The 35% / 65% proposal is preserved for that discussion and must not become a score in the first slice. Checkmarks remain excluded from assessment throughout.
 
