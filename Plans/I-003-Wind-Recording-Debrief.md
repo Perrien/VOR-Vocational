@@ -1,12 +1,12 @@
 # I-003 — Wind, flight recording, and first debrief
 
-**Status:** Stage 1 implemented and behavior-verified — awaiting owner review
+**Status:** Stage 2 implemented and behavior-verified — awaiting owner review
 
 **Idea:** [I-003 in IDEAS.md](../IDEAS.md#i-003--mission-quality-and-debrief)
 
 **Requirements:** [Settled exploration](../Explorations/I-003-mission-quality-and-debrief.md)
 
-**Current checkpoint:** Stage 1 — Navigate with steady wind; owner visual review and commit decision pending
+**Current checkpoint:** Stage 2 — Inspect the completed flight; owner visual review and commit decision pending
 
 ## Outcome and boundaries
 
@@ -365,7 +365,7 @@ within the existing briefing/session ownership boundaries are sufficient.
 
 ### Stage 1 — Navigate with steady wind
 
-**State:** Implemented and behavior-verified; awaiting owner visual review and commit decision
+**State:** Complete — owner accepted and committed as `76f44b7 Add steady wind and model-owned flight motion`
 
 - [x] Add the pure calibration, wind value, and direct trajectory evaluator.
   Apply the agreed turn rules, including consistent right turns at 180°;
@@ -458,57 +458,57 @@ delivered at this checkpoint; manual completion remains available.
 - Shared runner/setup/physics/definition code contains no Transport, Silverkeep,
   Midland, fixed first-mission point/step count, or bundled-plan lookup.
 
-**Owner review still required**
+**Owner handoff**
 
-- [ ] Review the briefing, validation, mission panel, and result at 1100×760.
-  Desktop capture returned only a Stage Manager thumbnail, so full-size
-  readability and a physical chart-marker drag could not be visually verified.
-- [ ] Try wind correction using NAV instruments and confirm the shared Free
-  Flight movement beyond the display crop is acceptable.
-- [ ] Choose whether to commit Stage 1 before any Stage 2 implementation.
+- The owner reported Stage 1 working, committed it as `76f44b7`, and explicitly
+  authorized Stage 2. No further Stage 1 commit decision is pending.
+- Detailed minimum-window readability and physical chart-marker drag were not
+  verifiable in automation. Retain those checks for the final visual review;
+  do not reinterpret the owner's general acceptance as a measured visual test.
 
 **Try it:** The verified Debug app is at
 `/tmp/VOR-I003-DerivedData/Build/Products/Debug/VOR Vocational.app`.
 Open Missions → Transport, select Steady wind, enter 270° / 20 kt, and Fly
 Transport. Window → Flight Diagnostics exposes the main session's truth only
 for development. Window → Mission Runner Preview opens the alternate input.
-Path recording, automatic off-map ending, and a debrief remain unimplemented.
+At the Stage 1 checkpoint, recording, automatic ending, and debrief were still
+pending. Stage 2 below now delivers them.
 
 ### Stage 2 — Record the flight and show a first working debrief
 
-**State:** Not started; depends on Stage 1's owner checkpoint
+**State:** Implemented and behavior-verified; awaiting owner visual review and commit decision
 
-- [ ] Add the sample schedule and exact start/finish rules to all mission
+- [x] Add the sample schedule and exact start/finish rules to all mission
   sessions. Complete the immutable result and idempotent ending lifecycle.
-- [ ] Add the monotone-interval crossing solver and finalize at the earliest
+- [x] Add the monotone-interval crossing solver and finalize at the earliest
   outward full-source edge crossing, including an exit/reentry within one
   turning advance. Ignore checklist interactions throughout.
-- [ ] Replace the cockpit/result-card layout after either ending with a
+- [x] Replace the cockpit/result-card layout after either ending with a
   shared `MissionDebriefView` reading the snapshot. The first functional chart
   uses the full source artwork and fits both supplied planned and flown paths,
   or the flown path alone when the mission supplies no planned route.
   It must already reveal the actual final position and distinguish the paths.
-- [ ] Show mission title, wind, simulated H:MM:SS, and direct distance from the
+- [x] Show mission title, wind, simulated H:MM:SS, and direct distance from the
   supplied named arrival reference to two decimals in NM when present. For the
   first integration this is Midland Cityport; do not hard-code it in the view.
   Show reason **Flight Complete** or **Left the chart**. Label
   this as an unscored review. Include Fly Again, Back to Briefing, Back to
   Missions, and Home with the agreed recording/setup lifetimes.
-- [ ] Expose sample count, last sample time, recording polyline, and ending
+- [x] Expose sample count, last sample time, recording polyline, and ending
   reason in Debug diagnostics while a session is inspectable. Use the actual
   model values, not a second debug simulation or a production reveal switch.
-- [ ] Test t=0 finish, regular/finish coincidence, fractional finish, multiple
+- [x] Test t=0 finish, regular/finish coincidence, fractional finish, multiple
   crossed seconds, stationary recording, pause/resume, repeated completion,
   stale ticks after completion, retry/exit disposal, and checklist independence.
-- [ ] Test each chart edge, corners, starting on an edge inward/outward/along,
+- [x] Test each chart edge, corners, starting on an edge inward/outward/along,
   tangential contact without exit, wind-only exit, and curved exit/reentry
   with a later inside endpoint. Verify the same exact ending/sample contract
   at every playback speed using independent expected crossings.
-- [ ] Run the alternate-definition recording/completion/retry checks and
+- [x] Run the alternate-definition recording/completion/retry checks and
   shared-debrief preview from the reuse contract. Verify optional arrival
   measurements and planned geometry, dynamic names, different route lengths,
   and cross-mission isolation without a Transport-specific branch.
-- [ ] Update README and record verification here without claiming final
+- [x] Update README and record verification here without claiming final
   debrief interaction or visual acceptance.
 
 **Visible checkpoint:** Complete before Play to see a one-point flight at
@@ -528,6 +528,78 @@ the simulation. The initial chart must be useful at 1100×760 even before polish
 **Commit point:** Show the results and stop for the owner to choose whether to
 commit **before Stage 3**. Suggested commit:
 `Record mission flights and reveal their unscored debrief`.
+
+**Verification result — 2026-10-15**
+
+- Full macOS suite: **53 tests passed, 0 failures**, with the existing shared
+  scheme, test plan, and signing configuration. No project, dependency, bundled
+  content, or existing numeric tolerance changes.
+- Final result bundle:
+  `/tmp/VOR-I003-DerivedData/Logs/Test/Test-VOR Vocational-2026.10.15_18-44-29--0500.xcresult`.
+- Recording checks cover exact start, every crossed integer second in a large
+  advance, actual heading/airspeed, stationary and wind-only flights, pause/
+  resume, fractional finish, coincident regular/finish and start/finish, repeat
+  completion, stale ticks, checklist independence, retry, and release of the
+  previous session while retaining an immutable completed value.
+- Eight one-hour recordings (Calm and 40-kt wind at 1×/5×/10×/30×) each retained
+  3,601 scheduled samples. All regular timestamps matched; cross-playback
+  positions/headings met 1e-6 NM / 1e-7° and final time met 1e-6 s. Independent
+  arc-plus-wind samples met 1e-7 NM, including a finish after target arrival.
+- Independent exit references cover all four edges, corners, outward/inward/
+  along-edge starts, exact endpoint crossings, touch-and-return, touch followed
+  by edge tracking, wind cancellation, wind-only exit, and fractional endings.
+  Calm and wind-shifted curved exit/reentry cases have known first crossings
+  at 10 s and 20 s despite later inside endpoints. Crossing checks met the
+  plan's 1e-6 s / 1e-7 NM criteria without widening any existing tolerance.
+- Boundary failures pause without advancing position, time, or recording and
+  expose the failure. They never silently retain a later outside state.
+- Completed state and time now derive from the final recorded sample. The old
+  distance-only constructor was removed because it cannot supply an honest
+  path. Its existing 0-NM / 50-NM assertions now run recorded stationary flights
+  at the same positions and durations, retaining the original numeric checks.
+- In the running app, finishing Transport before Play opened a dedicated
+  debrief with **one recorded sample, six planned points, 0:00:00, 89.24 NM**,
+  Calm, and Flight Complete. The cockpit was absent; no segment was invented.
+- A northbound 260-kt flight with Wind from 270° at 20 kt at 30× paused at
+  **1715.94 s**, with **1,716 samples** and last regular time **1715.000000 s**.
+  Both remained unchanged while paused. Checking step 2 and resuming continued
+  the same recording.
+- That flight automatically opened Left the chart at the full north edge:
+  **2979.933110 s, 2,981 samples, x=0.3731, y=0**, with a displayed 0:49:40 and
+  255.97 NM from Midland Cityport. The final timestamp/count/position remained
+  frozen. The fitted chart includes the portion outside the live display crop.
+- Fly Again reset the flight/checks/clock while preserving wind. A separate
+  manual completion retained **12 samples**, ending at **10.099874 s** and
+  reporting 89.45 NM. Back to Briefing retained 270° / 20 kt; Diagnostics then
+  showed no active session, confirming the prior recording was released.
+- The alternate in-memory mission used the same debrief with its own title,
+  two planned points, one start/finish sample, 180° / 15-kt wind, and Survey
+  endpoint measurement (106.24 NM). Retry restored its own starting state.
+  Unit coverage also checks empty route/arrival inputs and cross-mission
+  recording isolation. Shared recording/exit/debrief code has no first-mission
+  names or bundle lookup.
+- Basic fit/projection checks cover full source edges, physical aspect ratio,
+  stationary tracks, and complete route/track containment. The chart draws the
+  uncropped source artwork and positions marker symbols at exact coordinates.
+  Pan, zoom, Fit Flight, label collision tuning, and final visual acceptance
+  remain Stage 3 work.
+
+**Owner checkpoint**
+
+- [ ] Review the planned/flown comparison, markers, legend, reason, measurements,
+  and actions at 1100×760. Capture initially returned a blank preview; activating
+  the verified app through Finder produced a Stage Manager thumbnail showing
+  both routes and the full edge track, but full-size readability could not be
+  confirmed. Do not mark this as final visual acceptance.
+- [ ] Choose whether to commit Stage 2 before Stage 3 implementation.
+
+**Try it:** The verified app is open on a completed northbound wind flight.
+Use Fly Again to start a new recording with the same conditions; Flight Complete
+opens the static comparison at any time. For an automatic ending, fly north
+at 30× until the full chart edge. Window → Flight Diagnostics shows sample
+count, exact last timestamp, path, and ending. Window → Mission Runner Preview
+uses different mission data through the same flow. The current view fits the
+flight automatically; pan/zoom and Fit Flight are deliberately still pending.
 
 ### Stage 3 — Finish debrief inspection and visual verification
 
@@ -617,4 +689,4 @@ never widen an existing tolerance or move a fixture to obtain a pass.
   debrief mandatory for authored and generated missions, with reuse checks.
 - Checked whitespace and all 11 local document links; no missing targets.
 - App tests were not run for this documentation-only change.
-- Stage 1 implementation/test evidence is recorded above. Stages 2–3 and owner acceptance remain pending.
+- Stage 1 is accepted and committed as `76f44b7`. Stage 2 evidence is recorded above; its owner checkpoint and Stage 3 remain pending.

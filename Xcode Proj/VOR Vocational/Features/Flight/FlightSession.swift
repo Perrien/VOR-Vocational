@@ -63,8 +63,8 @@ final class FlightSession {
     var speedKnots: Double = 260
     private var flightIsPlaying = false
     var isFlying: Bool {
-        get { flightIsPlaying && completion == nil }
-        set { flightIsPlaying = newValue && completion == nil }
+        get { flightIsPlaying && completion == nil && simulationError == nil }
+        set { flightIsPlaying = newValue && completion == nil && simulationError == nil }
     }
     var timeMultiplier: Double = 1
     /// Elapsed simulation time, including the selected playback multiplier.
@@ -73,6 +73,9 @@ final class FlightSession {
     let conditions: FlightConditions
     let mission: MissionFlightDefinition?
     private(set) var completion: MissionFlightCompletion?
+    private(set) var recording: FlightRecording?
+    private(set) var simulationError: String?
+    private var clockCompensation = 0.0
     var nav1 = NAVReceiver()
     var nav2 = NAVReceiver()
 
@@ -97,6 +100,7 @@ final class FlightSession {
         speedKnots = initialState.speedKnots
         self.conditions = conditions
         self.mission = mission
+        recording = mission == nil ? nil : FlightRecording(initialState: initialState)
     }
 
     convenience init(normalizedAirportPosition: CGPoint) {
@@ -123,20 +127,42 @@ final class FlightSession {
         let trajectory = FlightPhysics.Trajectory(start: aircraftState,
                                                  selectedHeading: selectedHeading,
                                                  conditions: conditions)
-        let next = trajectory.state(at: elapsed)
+        let startTime = elapsedSimulatedSeconds
+        let adjusted = elapsed - clockCompensation
+        let proposedEnd = startTime + adjusted
+        guard proposedEnd.isFinite else { return }
+        let duration = proposedEnd - startTime
+        let exit: FlightPhysics.Trajectory.ChartExit?
+        do {
+            exit = try mission == nil ? nil : trajectory.firstChartExit(through: duration, startingAt: startTime)
+        } catch {
+            isFlying = false
+            simulationError = error.localizedDescription
+            return
+        }
+        let endTime = exit.map { startTime + $0.elapsed } ?? proposedEnd
+        let next = exit?.state ?? trajectory.state(at: duration)
+        recording?.record(trajectory, startingAt: startTime, through: endTime)
+        clockCompensation = exit == nil ? (proposedEnd - startTime) - adjusted : 0
         normalizedAircraftPosition = next.normalizedPosition
         heading = next.heading
-        elapsedSimulatedSeconds += elapsed
+        elapsedSimulatedSeconds = endTime
+        if exit != nil { finishMission(ending: .leftChart) }
     }
 
     @discardableResult
     func completeMission() -> MissionFlightCompletion? {
+        finishMission(ending: .playerCompleted)
+    }
+
+    @discardableResult
+    private func finishMission(ending: MissionFlightEnding) -> MissionFlightCompletion? {
         if let completion { return completion }
         guard let mission else { return nil }
         isFlying = false
-        let result = MissionFlightCompletion(mission: mission, aircraftState: aircraftState,
-                                             conditions: conditions,
-                                             simulatedElapsedSeconds: elapsedSimulatedSeconds)
+        recording?.finish(at: elapsedSimulatedSeconds, state: aircraftState)
+        let result = MissionFlightCompletion(mission: mission, recording: recording!.samples,
+                                             conditions: conditions, ending: ending)
         completion = result
         return result
     }

@@ -26,31 +26,34 @@ struct MissionFlightView: View {
     }
 
     var body: some View {
-        MapView(session: session, configuration: .mission,
-                sidePanelTitle: "Mission", isSidePanelPresented: $showsMissionPanel,
-                sidePanel: { flightCard })
-            .id(ObjectIdentifier(session))
-            .overlay(alignment: .topLeading) {
-                HStack(spacing: 10) {
-                    HomeControl(action: { leave(onHome) })
-                    Button { leave(onBriefing) } label: {
-                        Label("Back to Briefing", systemImage: "chevron.backward")
+        ZStack {
+            if let completion = session.completion {
+                MissionDebriefView(completion: completion, onFlyAgain: flyAgain,
+                                   onBriefing: { leave(onBriefing) },
+                                   onMissions: { leave(onMissions) }, onHome: { leave(onHome) })
+            } else {
+                MapView(session: session, configuration: .mission,
+                        sidePanelTitle: "Mission", isSidePanelPresented: $showsMissionPanel,
+                        sidePanel: { missionCard })
+                    .id(ObjectIdentifier(session))
+                    .overlay(alignment: .topLeading) {
+                        HStack(spacing: 10) {
+                            HomeControl(action: { leave(onHome) })
+                            Button { leave(onBriefing) } label: {
+                                Label("Back to Briefing", systemImage: "chevron.backward")
+                            }
+                            .buttonStyle(.glass)
+                        }
+                        .padding(.top, 40).padding(.leading, 16)
                     }
-                    .buttonStyle(.glass)
-                }
-                .padding(.top, 40).padding(.leading, 16)
             }
-            .ignoresSafeArea()
-            .onAppear { diagnosticsStore.activeSession = session }
-            .onDisappear {
-                session.isFlying = false
-                if diagnosticsStore.activeSession === session { diagnosticsStore.activeSession = nil }
-            }
-    }
-
-    @ViewBuilder private var flightCard: some View {
-        if let completion = session.completion { resultCard(completion) }
-        else { missionCard }
+        }
+        .ignoresSafeArea()
+        .onAppear { diagnosticsStore.activeSession = session }
+        .onDisappear {
+            session.isFlying = false
+            if diagnosticsStore.activeSession === session { diagnosticsStore.activeSession = nil }
+        }
     }
 
     private var missionCard: some View {
@@ -67,6 +70,9 @@ struct MissionFlightView: View {
                 ForEach(Array(mission.instructions.enumerated()), id: \.offset) { index, step in
                     instructionRow(step, at: index)
                 }
+            }
+            if let error = session.simulationError {
+                Text(error).font(.caption).foregroundStyle(.red)
             }
             Divider()
             resultMetric(title: "SIMULATED TIME", value: formatTime(session.elapsedSimulatedSeconds))
@@ -110,31 +116,6 @@ struct MissionFlightView: View {
         }
         .padding(10).frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 10))
-    }
-
-    private func resultCard(_ completion: MissionFlightCompletion) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Flight Complete").font(.title3.weight(.bold))
-            Text(completion.mission.title).font(.caption.weight(.semibold))
-            Text("Your position was measured when you marked the flight complete.")
-                .font(.caption).foregroundStyle(ControlPalette.secondaryText)
-            Divider()
-            resultMetric(title: "SIMULATED TIME", value: formatTime(completion.simulatedElapsedSeconds))
-            Text(completion.conditions.label).font(.caption.monospacedDigit())
-            if let destination = completion.mission.arrivalReference,
-               let distance = completion.distanceFromDestinationNM {
-                resultMetric(title: "DISTANCE FROM \(destination.name.uppercased())",
-                             value: String(format: "%.2f NM", distance))
-            }
-            Divider()
-            Button(action: flyAgain) {
-                Label("Fly Again", systemImage: "arrow.counterclockwise").frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent).tint(ControlPalette.accent)
-            Button("Back to Missions") { leave(onMissions) }.buttonStyle(.bordered)
-        }
-        .foregroundStyle(ControlPalette.primaryText)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func resultMetric(title: String, value: String) -> some View {

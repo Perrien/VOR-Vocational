@@ -1,6 +1,6 @@
 # I-003 — Mission quality and debrief
 
-**Status:** Stage 1 implemented and behavior-verified; owner review pending
+**Status:** Stage 1 committed; Stage 2 implemented and behavior-verified, owner review pending
 
 **Idea:** [I-003 in IDEAS.md](../IDEAS.md#i-003--mission-quality-and-debrief)
 
@@ -197,7 +197,7 @@ The existing initiative records route tracking and arrival accuracy as separate 
 
 ## App baseline used for planning
 
-This section records the pre-implementation baseline. Stage 1 has since delivered wind and shared model-owned movement; see the active plan and README for current behavior.
+This section records the pre-implementation baseline. Stages 1–2 have since delivered wind, shared model-owned movement, recording, chart-exit endings, and the first debrief; see the active plan and README for current behavior.
 
 The source agreed with the README about the current mission:
 
@@ -243,7 +243,7 @@ These are user-visible outcomes and their dependencies, not implementation tasks
 
 ## Planning handoff
 
-The [active build plan](../Plans/I-003-Wind-Recording-Debrief.md) now turns these settled requirements into three implementation stages: navigating with steady wind, inspecting a recorded flight in a first working debrief, and completing pan/zoom and visual verification. Stage 1 is implemented and behavior-verified. Stop at its owner review/commit checkpoint before Stage 2.
+The [active build plan](../Plans/I-003-Wind-Recording-Debrief.md) now turns these settled requirements into three implementation stages: navigating with steady wind, inspecting a recorded flight in a first working debrief, and completing pan/zoom and visual verification. Stage 1 is accepted and committed as `76f44b7`. Stage 2 is implemented and behavior-verified; stop at its owner review/commit checkpoint before Stage 3.
 
 Scoring remains a separate later exploration within I-003, informed by the resulting flight evidence. The 35% / 65% proposal is preserved for that discussion and must not become a score in the first slice. Checkmarks remain excluded from assessment throughout.
 

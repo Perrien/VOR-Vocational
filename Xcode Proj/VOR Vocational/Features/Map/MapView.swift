@@ -131,7 +131,7 @@ struct MapView<ChartOverlay: View, SidePanel: View>: View {
                                          isFlying: $session.isFlying,
                                          timeMultiplier: $session.timeMultiplier,
                                          showsFlightControls: configuration.showsFlightControls)
-                            .disabled(session.completion != nil)
+                            .disabled(session.completion != nil || session.simulationError != nil)
                     }
                 } nav1: {
                     NavRadioView(

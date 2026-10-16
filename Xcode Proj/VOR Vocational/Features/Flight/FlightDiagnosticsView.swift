@@ -37,6 +37,17 @@ private struct FlightDiagnosticsContent: View {
                 LabeledContent("Simulated time", value: String(format: "%.2f s", session.elapsedSimulatedSeconds))
             }
 
+            if let recording = session.recording {
+                Section("Recording") {
+                    LabeledContent("Samples", value: String(recording.samples.count))
+                    LabeledContent("Last sample", value: String(format: "%.6f s", recording.samples.last!.simulatedSeconds))
+                    if let completion = session.completion {
+                        LabeledContent("Ending", value: completion.ending.label)
+                    }
+                }
+            }
+            if let error = session.simulationError { Text(error).foregroundStyle(.red) }
+
             Section("Position") {
                 LabeledContent(
                     "Normalized",
@@ -113,6 +124,16 @@ private struct FlightDiagnosticsMap: View {
             let imageRect = FlatMap.fittedRect(in: geometry.size, crop: crop)
             ZStack {
                 FlatMap(imageRect: imageRect, crop: crop)
+                if let recording = session.recording {
+                    Path { path in
+                        guard let first = recording.samples.first else { return }
+                        path.move(to: FlatMap.point(for: first.aircraftState.normalizedPosition, in: imageRect, crop: crop))
+                        for sample in recording.samples.dropFirst() {
+                            path.addLine(to: FlatMap.point(for: sample.aircraftState.normalizedPosition, in: imageRect, crop: crop))
+                        }
+                    }
+                    .stroke(.blue, lineWidth: 2)
+                }
                 PlaneIcon(heading: session.heading)
                     .position(FlatMap.point(for: session.normalizedAircraftPosition,
                                              in: imageRect, crop: crop))

@@ -27,45 +27,39 @@ nonisolated struct MissionFlightProgress: Equatable {
     }
 }
 
-/// The unscored measurement captured when a player explicitly marks a mission
-/// flight complete. It reports raw distance from the destination; it does not
-/// decide whether the player arrived successfully.
+/// An immutable completed flight. The final recorded sample is authoritative
+/// for the ending state, clock, and unscored arrival measurement.
 nonisolated struct MissionFlightCompletion: Equatable {
     let mission: MissionFlightDefinition
-    let aircraftState: FlightAircraftState
+    let recording: [FlightSample]
+    let ending: MissionFlightEnding
     let conditions: FlightConditions
-    let simulatedElapsedSeconds: TimeInterval
     let distanceFromDestinationNM: Double?
 
-    init(mission: MissionFlightDefinition, aircraftState: FlightAircraftState,
-         conditions: FlightConditions, simulatedElapsedSeconds: TimeInterval,
+    var aircraftState: FlightAircraftState { recording.last!.aircraftState }
+    var simulatedElapsedSeconds: TimeInterval { recording.last!.simulatedSeconds }
+
+    init(mission: MissionFlightDefinition, recording: [FlightSample],
+         conditions: FlightConditions, ending: MissionFlightEnding,
          mapWidthNM: Double = FlightWorld.widthNM, mapHeightNM: Double = FlightWorld.heightNM) {
-        precondition(simulatedElapsedSeconds.isFinite && simulatedElapsedSeconds >= 0,
-                     "Simulated elapsed time must be finite and non-negative.")
+        precondition(recording.first?.simulatedSeconds == 0 && !recording.isEmpty,
+                     "A completed flight must retain its exact starting sample.")
+        precondition(recording.allSatisfy { $0.simulatedSeconds.isFinite },
+                     "Recording timestamps must be finite.")
+        precondition(zip(recording, recording.dropFirst()).allSatisfy {
+            $0.simulatedSeconds < $1.simulatedSeconds
+        }, "Recording timestamps must increase strictly.")
         precondition(mapWidthNM.isFinite && mapWidthNM > 0 &&
                      mapHeightNM.isFinite && mapHeightNM > 0,
                      "Mission map dimensions must be finite and greater than zero.")
         self.mission = mission
-        self.aircraftState = aircraftState
+        self.recording = recording
         self.conditions = conditions
-        self.simulatedElapsedSeconds = simulatedElapsedSeconds
+        self.ending = ending
         distanceFromDestinationNM = mission.arrivalReference.map {
-            VORNavigation.distanceNM(fromNormalized: aircraftState.normalizedPosition,
+            VORNavigation.distanceNM(fromNormalized: recording.last!.aircraftState.normalizedPosition,
                                      toNormalized: $0.normalizedPosition,
                                      mapWidthNM: mapWidthNM, mapHeightNM: mapHeightNM)
         }
-    }
-
-    init(
-        resolvedPlan: ResolvedFlightPlan,
-        aircraftPosition: CGPoint,
-        simulatedElapsedSeconds: TimeInterval,
-        mapWidthNM: Double,
-        mapHeightNM: Double
-    ) {
-        self.init(mission: MissionFlightDefinition(resolvedPlan: resolvedPlan),
-                  aircraftState: FlightAircraftState(normalizedPosition: aircraftPosition),
-                  conditions: .calm, simulatedElapsedSeconds: simulatedElapsedSeconds,
-                  mapWidthNM: mapWidthNM, mapHeightNM: mapHeightNM)
     }
 }
