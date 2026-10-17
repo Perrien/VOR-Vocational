@@ -133,7 +133,7 @@ Keep a **compact current/next timing strip just above the cockpit**, confirmed b
 
 - The strip remains visible whether the mission panel is open or hidden. It is part of the live mission surface rather than content that disappears with the collapsible panel.
 - Show the current leg's estimated remaining time and the next leg's full duration at current airspeed. Identify which legs those values refer to and state the still-air basis.
-- Keep the full original schedule, cumulative planned arrival times, selected leg's updated arrival time, and explicit timer controls in the mission panel.
+- Keep the full original schedule, cumulative planned arrival times, selected leg's updated arrival time, and explicit timer controls in the mission panel. In the owner's **2026-10-16** Stage 2 review, this was clarified to **one instruction list with timing in each step**, replacing the implemented duplicate NAV/timing lists. The plan applies shared combined cards to briefing and flight, while preserving separate underlying geometry and navigation guidance.
 - The briefing presents the full original schedule before flight using the assigned planning airspeed. The live mission retains that schedule for reference.
 - Preserve readable cockpit instruments and chart controls, including at the existing **1100×760** minimum content size. Do not place geographic progress or true aircraft position on the chart as part of the timing display.
 - Exact typography, spacing, and compact time formatting remain visual-design choices for the bounded feature plan. The persistent-summary placement and information split are settled.

@@ -153,15 +153,13 @@ private struct FlightPlanPanel: View {
                 VStack(alignment: .leading, spacing: 14) {
                     summary
                     Divider()
-                    MissionTimingScheduleView(schedule: briefing.timingSchedule)
-                    Divider()
                     MissionWindSetupView(setup: $windSetup)
                     Divider()
-                    Text("NAV instructions")
+                    Text("Mission steps")
                         .font(.headline)
-                    ForEach(Array(briefing.steps.enumerated()), id: \.offset) { index, step in
-                        FlightPlanStepRow(number: index + 1, step: step)
-                    }
+                    Text("Still-air timing at \(briefing.timingSchedule.planningAirspeedKnots.formatted()) kt · Reach is elapsed flight time.")
+                        .font(.caption).foregroundStyle(ControlPalette.secondaryText)
+                    MissionInstructionListView(instructions: briefing.instructions, schedule: briefing.timingSchedule)
                 }
             }
 
@@ -198,50 +196,6 @@ private struct FlightPlanPanel: View {
     private var stillAirEstimateLabel: String {
         let minutes = Int((briefing.stillAirEstimate.durationSeconds / 60).rounded())
         return "Still air: \(minutes) min at \(Int(briefing.stillAirEstimate.cruiseSpeedKnots)) kt"
-    }
-}
-
-private struct FlightPlanStepRow: View {
-    let number: Int
-    let step: FlightPlanBriefingStep
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Text("\(number)")
-                .font(.caption.weight(.bold).monospacedDigit())
-                .foregroundStyle(.white)
-                .frame(width: 22, height: 22)
-                .background(step.kind == .terminalReference ? Color.orange : ControlPalette.accent,
-                            in: Circle())
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(step.kind == .terminalReference ? "Final position reference" : step.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ControlPalette.primaryText)
-
-                if let distanceNM = step.distanceNM {
-                    Text(String(format: "%.1f NM", distanceNM))
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(ControlPalette.secondaryText)
-                }
-
-                Text("Tune \(step.guidance.stationIdent) \(String(format: "%.2f", step.guidance.frequencyMHz))")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(ControlPalette.secondaryText)
-                Text("Set OBS \(String(format: "%03d", step.guidance.obsDegrees))° · Confirm \(step.guidance.flag.rawValue)")
-                    .font(.caption.monospacedDigit().weight(.semibold))
-                    .foregroundStyle(ControlPalette.primaryText)
-
-                if step.kind == .terminalReference {
-                    Text("Use this practical radial reference to locate Midland; it is not a literal airport course.")
-                        .font(.caption)
-                        .foregroundStyle(ControlPalette.secondaryText)
-                }
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 10))
     }
 }
 

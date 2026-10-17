@@ -63,8 +63,12 @@ final class FlightSession {
     var speedKnots: Double = 260
     private var flightIsPlaying = false
     var isFlying: Bool {
-        get { flightIsPlaying && completion == nil && simulationError == nil }
-        set { flightIsPlaying = newValue && completion == nil && simulationError == nil }
+        get { flightIsPlaying && completion == nil && simulationError == nil && !hasLeftMission }
+        set {
+            let willPlay = newValue && completion == nil && simulationError == nil && !hasLeftMission
+            if willPlay && !flightIsPlaying { legTiming?.firstPlay(at: elapsedSimulatedSeconds) }
+            flightIsPlaying = willPlay
+        }
     }
     var timeMultiplier: Double = 1
     /// Elapsed simulation time, including the selected playback multiplier.
@@ -75,6 +79,8 @@ final class FlightSession {
     private(set) var completion: MissionFlightCompletion?
     private(set) var recording: FlightRecording?
     private(set) var simulationError: String?
+    private(set) var legTiming: MissionLegTiming?
+    private(set) var hasLeftMission = false
     private var clockCompensation = 0.0
     var nav1 = NAVReceiver()
     var nav2 = NAVReceiver()
@@ -100,6 +106,7 @@ final class FlightSession {
         speedKnots = initialState.speedKnots
         self.conditions = conditions
         self.mission = mission
+        legTiming = mission?.timingSchedule.map { MissionLegTiming(schedule: $0) }
         recording = mission == nil ? nil : FlightRecording(initialState: initialState)
     }
 
@@ -114,6 +121,29 @@ final class FlightSession {
     var aircraftState: FlightAircraftState {
         FlightAircraftState(normalizedPosition: normalizedAircraftPosition,
                             heading: heading, speedKnots: speedKnots)
+    }
+
+    var timingDisplay: MissionLegTiming.Display? {
+        legTiming?.display(at: elapsedSimulatedSeconds, airspeedKnots: speedKnots)
+    }
+
+    var canAdjustMissionTiming: Bool {
+        mission != nil && completion == nil && simulationError == nil && !hasLeftMission
+    }
+
+    func startMissionLeg(at index: Int) {
+        guard canAdjustMissionTiming else { return }
+        legTiming?.startLeg(at: index, flightTime: elapsedSimulatedSeconds)
+    }
+
+    func undoMissionLegStart() {
+        guard canAdjustMissionTiming else { return }
+        legTiming?.undoStart()
+    }
+
+    func leaveMission() {
+        isFlying = false
+        if mission != nil { hasLeftMission = true }
     }
 
     /// The only live advancement entry point. Pause/completion guard stale ticks.
@@ -143,6 +173,7 @@ final class FlightSession {
         let endTime = exit.map { startTime + $0.elapsed } ?? proposedEnd
         let next = exit?.state ?? trajectory.state(at: duration)
         recording?.record(trajectory, startingAt: startTime, through: endTime)
+        legTiming?.advance(startingAt: startTime, seconds: endTime - startTime, airspeedKnots: speedKnots)
         clockCompensation = exit == nil ? (proposedEnd - startTime) - adjusted : 0
         normalizedAircraftPosition = next.normalizedPosition
         heading = next.heading

@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 /// A flat map with an optional side panel, above the full-width NAV cockpit.
-struct MapView<ChartOverlay: View, SidePanel: View>: View {
+struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
     @Bindable var session: FlightSession
     private let configuration: FlightSurfaceConfiguration
 
@@ -18,6 +18,9 @@ struct MapView<ChartOverlay: View, SidePanel: View>: View {
     private let sidePanelTitle: String
     private let isSidePanelPresented: Binding<Bool>?
     private let sidePanelWidth: CGFloat = 340
+    /// Caller-owned status between chart and cockpit. Empty in other modes.
+    private let flightStatus: () -> FlightStatus
+    private let flightStatusHeight: CGFloat
 
     /// Overrides what the NAV radios receive from, independent of the plane
     /// icon's own (draggable) position. Defaults to nil, so reception keeps
@@ -31,7 +34,9 @@ struct MapView<ChartOverlay: View, SidePanel: View>: View {
          receptionPosition: CGPoint? = nil,
          sidePanelTitle: String = "Details",
          isSidePanelPresented: Binding<Bool>? = nil,
+         flightStatusHeight: CGFloat = 0,
          @ViewBuilder sidePanel: @escaping () -> SidePanel = { EmptyView() },
+         @ViewBuilder flightStatus: @escaping () -> FlightStatus = { EmptyView() },
          @ViewBuilder chartOverlay: @escaping (CGRect) -> ChartOverlay = { _ in EmptyView() }) {
         _session = Bindable(session)
         self.configuration = configuration
@@ -39,6 +44,8 @@ struct MapView<ChartOverlay: View, SidePanel: View>: View {
         self.sidePanelTitle = sidePanelTitle
         self.isSidePanelPresented = isSidePanelPresented
         self.sidePanel = sidePanel
+        self.flightStatusHeight = flightStatusHeight
+        self.flightStatus = flightStatus
         self.chartOverlay = chartOverlay
     }
 
@@ -65,7 +72,7 @@ struct MapView<ChartOverlay: View, SidePanel: View>: View {
             let cockpitHeight = CockpitLayout.height(forWidth: surfaceWidth)
             let showsSidePanel = isSidePanelPresented?.wrappedValue == true
             let mapSize = CGSize(width: max(0, surfaceWidth - (showsSidePanel ? sidePanelWidth + 1 : 0)),
-                                 height: max(0, geometry.size.height - cockpitHeight))
+                                 height: max(0, geometry.size.height - cockpitHeight - flightStatusHeight))
             // The cropped map image is aspect-fit inside the map area, so
             // everything on the map is positioned relative to this fitted rect.
             let imageRect = FlatMap.fittedRect(in: mapSize)
@@ -121,6 +128,11 @@ struct MapView<ChartOverlay: View, SidePanel: View>: View {
                     }
                     .padding(.top, 40)
                     .padding(.trailing, 16)
+                }
+
+                if flightStatusHeight > 0 {
+                    flightStatus()
+                        .frame(width: surfaceWidth, height: flightStatusHeight)
                 }
 
                 CockpitPanel(mapWidth: surfaceWidth, onSwap: { session.swapNAVReceivers() }) {

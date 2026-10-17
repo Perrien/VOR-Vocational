@@ -11,6 +11,10 @@ nonisolated struct MissionInstruction: Equatable {
     let title: String
     var guidance: VORGuidance? = nil
     var detail: String? = nil
+    /// Explicit association for displaying timing beside guidance. Checklist
+    /// order and geometric leg order are independent for generic missions.
+    var timingLegIndex: Int? = nil
+    var timingDetail: String? = nil
 }
 
 /// The shared runner accepts values from a catalog, an author, or a generator.
@@ -53,12 +57,7 @@ nonisolated struct MissionFlightDefinition: Equatable {
             arrivalReference: resolvedPlan.points.last.map {
                 MissionChartPoint(name: $0.name, normalizedPosition: $0.normalizedPosition)
             },
-            instructions: briefing.steps.map { step in
-                MissionInstruction(title: step.title, guidance: step.guidance,
-                                   detail: step.kind == .terminalReference
-                                   ? "Use this practical radial reference to locate \(briefing.destinationName); it is not a literal airport course."
-                                   : nil)
-            },
+            instructions: briefing.instructions,
             timingSchedule: briefing.timingSchedule
         )
     }

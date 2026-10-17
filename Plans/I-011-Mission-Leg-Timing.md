@@ -1,11 +1,11 @@
 # I-011 — Mission leg timing
 
-**Status:** Stage 1 accepted for commit; Stage 2 authorized
+**Status:** Stage 2 accepted for commit; Stage 3 authorized
 **Goal:** Let the player judge when to accelerate playback by reading a fixed still-air schedule, a current-leg running estimate, and a next-leg duration preview.
 
 **Idea:** [I-011 in IDEAS.md](../IDEAS.md#i-011--mission-leg-timing)
 **Requirements:** [Settled exploration](../Explorations/I-011-mission-leg-timing.md)
-**Current checkpoint:** Owner requested “Commit and then proceed.” Commit Stage 1, then implement Stage 2 through its checkpoint. Prior visual review limits remain recorded, not inferred as completed.
+**Current checkpoint:** Owner requested “Commit and proceed” after the combined-panel review. Commit Stage 2, then implement Stage 3 through its final checkpoint. No additional minimum-window visual review is inferred.
 
 ## Context, baseline, and boundaries
 
@@ -73,6 +73,16 @@ Use a pure value model for timing and a session-owned instance of that model. Th
 - With 0–60 seconds remaining, use a distinct approach style; after expiry use the **Past still-air estimate** label. Neither state means arrival or error. No audio, notifications, map markers, or new arrival rules.
 - Verify readability and scrolling at **1100×760** and larger sizes, both panel states, and long/repeated point labels. Visual adjustments to the 56-point height must be recorded with the minimum-window result, not compensated by shrinking cockpit instruments or changing the app minimum size.
 
+## Owner revision — one instruction list
+
+On 2026-10-16 the owner requested: “It needs to be reorganized into one set of instructions with the timing in each step.” This supersedes the separate schedule/NAV list presentation above and in the original Stage 1/2 UI tasks, while preserving their timing and navigation behavior.
+
+- Briefing and live mission use one ordered set of cards. Each instruction carries its associated geometric leg's planned distance, duration, and reach. The live current/next estimates and Start/Restart appear inside their corresponding cards; a compact shared Undo/header replaces the large repeated timing summary. The persistent strip remains.
+- Associate instructions with timing through an explicit optional geometric leg index. Never pair arbitrary instructions/legs by array count, matching labels, checkboxes, or hidden position. Generic instructions without an association remain untimed; unassociated geometric legs remain available as individual cards in the same list, without invented guidance or checklist entries. Show each timing leg once.
+- Transport's final Elmstead reference shares a card with timing for the final intersection-to-airport segment. Its instruction distance remains `nil`; label the geometric timing distinctly so it never becomes a fabricated VOR course or reference distance.
+- Keep independent checkmarks, timing operations/Undo, zero/invalid/absent states, original schedule arithmetic, flight physics/recordings, and strip layout intact. Use the existing files in the feature map, including the briefing/mission adapters and shared timing views; no Stage 3 work or new commit is authorized by this revision.
+- Verify explicit mapping/final-reference separation and generic unmapped/repeated-label inputs, run the full suite and Debug build, then inspect both combined lists and live controls at a useful visible checkpoint. Record actual results and visual limits below before returning to the owner.
+
 ## Optional return to 1×
 
 Stage 3 adds **Return to 1× with 1 minute remaining**, off by default. Starting a timed leg and automatic return are separate actions; neither changes the checklist.
@@ -110,10 +120,10 @@ All paths below are relative to the repository root. No project-membership edits
 | File | Stage | Responsibility |
 | --- | --- | --- |
 | `Xcode Proj/VOR Vocational/Domain/FlightPlanning/MissionTimingSchedule.swift` (new) | 1 | Timing legs, validation/availability, fixed schedule, explicit startup policy. |
-| `Xcode Proj/VOR Vocational/Domain/FlightPlanning/FlightPlanBriefing.swift` | 1 | Attach schedule separately from existing NAV instruction steps; update chart-only comment. |
-| `Xcode Proj/VOR Vocational/Domain/FlightPlanning/MissionFlightDefinition.swift` | 1 | Optional timing input and route adapter; preserve generic mission defaults. |
+| `Xcode Proj/VOR Vocational/Domain/FlightPlanning/FlightPlanBriefing.swift` | 1–2 | Attach schedule separately from existing NAV instruction steps; update chart-only comment. |
+| `Xcode Proj/VOR Vocational/Domain/FlightPlanning/MissionFlightDefinition.swift` | 1–2 | Optional timing input and route adapter; explicit instruction/leg associations for combined cards; preserve generic mission defaults. |
 | `Xcode Proj/VOR Vocational/Features/Missions/MissionTimingViews.swift` (new) | 1–3 | Read-only schedule first, then live strip/controls, then assist control. Shared labels/formatting. |
-| `Xcode Proj/VOR Vocational/Features/Missions/TransportBriefingView.swift` | 1, 3 | Render schedule; later own retained assist choice and pass it to runner. |
+| `Xcode Proj/VOR Vocational/Features/Missions/TransportBriefingView.swift` | 1–3 | Render timing inside instruction cards; later own retained assist choice and pass it to runner. |
 | `Xcode Proj/VOR Vocational/Domain/FlightPlanning/MissionLegTiming.swift` (new) | 2–3 | Selected/Undo contexts, speed-based progress, expiry, next preview, consumed-return state and threshold calculation. |
 | `Xcode Proj/VOR Vocational/Features/Flight/FlightSession.swift` | 2–3 | Timing lifecycle and accepted-time updates; later exact playback-return splitting. |
 | `Xcode Proj/VOR Vocational/Features/Missions/MissionFlightView.swift` | 2–3 | Shared panel actions/strip, reset flow, assist preference bridge, Debug-only alternate inputs. |
@@ -126,7 +136,7 @@ All paths below are relative to the repository root. No project-membership edits
 
 ## Stage 1 — Inspect the complete still-air schedule
 
-**State:** Implemented and verified automatically; owner authorized commit and continuation on 2026-10-16. Exact minimum-window and synthetic-preview visual checks remain recorded below.
+**State:** Committed as `ce8ea21` on 2026-10-16 after the owner authorized commit and continuation. Earlier visual limits remain recorded below.
 
 - [x] Read current records/source, preserve the existing exploration edits, and run the baseline macOS suite before source changes. Record the actual baseline count; the README reports 57 historical passing tests, not a result from this planning turn.
 - [x] Add timing input/validation/startup values and derive the schedule from every resolved geometric leg without modifying the route or instruction sequence.
@@ -146,13 +156,13 @@ All paths below are relative to the repository root. No project-membership edits
 
 ## Stage 2 — Use current and next timing in flight
 
-**State:** Authorized; begins after the Stage 1 commit.
+**State:** Implemented; automated and bounded visual verification passed. Owner review/commit pending, with the main-window visual limit recorded below.
 
-- [ ] Add the pure timing model and bounded selected/Undo context advancement, exact expiry, zero-speed/unselected/unavailable states, and next-leg preview.
-- [ ] Integrate timing startup, controls, accepted-time updates, and retry/completion into `FlightSession`. Preserve the existing movement/clock path; do not add automatic playback return yet.
-- [ ] Add the generic MapView status slot and live timing strip; add schedule/current reach and Start/Restart/Undo controls in the mission panel independently of checkboxes.
-- [ ] Extend the existing Debug-only Mission Runner Preview with named in-memory presets: **Timed 20-NM route with a 4-NM next leg at 120 kt**, **Manual start away from origin**, **No timing**, and **Invalid timing**. Use a simple development-only preset selector; switching presets visibly resets that preview's flight. Do not change app scenes or production missions.
-- [ ] Verify the cases below and minimum-window layout with panel open/hidden. Update docs with implemented timing and the still-pending optional assist.
+- [x] Add the pure timing model and bounded selected/Undo context advancement, exact expiry, zero-speed/unselected/unavailable states, and next-leg preview.
+- [x] Integrate timing startup, controls, accepted-time updates, and retry/completion into `FlightSession`. Preserve the existing movement/clock path; do not add automatic playback return yet.
+- [x] Add the generic MapView status slot and live timing strip; add schedule/current reach and Start/Restart/Undo controls in the mission panel independently of checkboxes.
+- [x] Extend the existing Debug-only Mission Runner Preview with named in-memory presets: **Timed 20-NM route with a 4-NM next leg at 120 kt**, **Manual start away from origin**, **No timing**, and **Invalid timing**. Use a simple development-only preset selector; switching presets visibly resets that preview's flight. Do not change app scenes or production missions.
+- [x] Verify the cases below and minimum-width Debug preview with panel open/hidden; record the remaining main-window limit. Update docs with implemented timing and the still-pending optional assist.
 
 **Verification:** Full suite and Debug build. Cover first Play versus resume, explicit pre-Play selection/Undo, selecting any geometric leg, paused starts, one-level Undo, speed changes, zero speed, expiry, post-expiry speed edits, final-leg next omission, unavailable timing, completion before Play, Fly Again, and leaving a flight. In particular:
 
@@ -165,12 +175,12 @@ All paths below are relative to the repository root. No project-membership edits
 
 **Commit point:** Show verification and live trial path, then stop before Stage 3 changes. Suggested commit: **`Add live mission leg estimates and timing controls`**.
 
-- [ ] Owner reviewed Stage 2 and chose whether/how to commit.
-- [ ] Owner explicitly authorized Stage 3.
+- [x] Owner chose to commit Stage 2, including the unified panel revision: “Commit and proceed.”
+- [x] Owner explicitly authorized Stage 3 with the same instruction.
 
 ## Stage 3 — Optionally return playback to 1×
 
-**State:** Not started; requires Stage 2 checkpoint decision.
+**State:** Authorized; begins after the Stage 2 commit.
 
 - [ ] Add the retained per-briefing enable choice and its shared-runner bridge; default off. Expose the toggle in the live timing controls with the exact one-minute condition.
 - [ ] Add pure threshold/eligibility and per-context consumed state. Preserve one-shot behavior through Undo, pause, speed edits, toggles, and manual overrides; apply the short-leg/in-threshold/expired rules above.
@@ -241,3 +251,30 @@ The planning-only change ran no app tests/builds. Stage 1 results follow; later 
 - Final checks: `git diff --check` passed, new source files have no trailing whitespace, and all **12 local document links** in README, IDEAS, glossary, this plan, and the I-011 exploration resolve. No Stage 2 source changes, dependency/configuration changes, bundled content edits, fixture/tolerance changes, or commit were made. **Waiting at the Stage 1 commit point for the owner's review and commit/proceed choice.**
 
 - Owner then requested **“Commit and then proceed.”** Stage 1 is authorized for commit and Stage 2 may begin afterward. Pre-existing plan archive moves remain outside the feature commit; their two repaired README/IDEAS link targets remain working-tree edits alongside those moves. The committed documents retain links to the still-tracked plan location until that separate reorganization is committed. I-003 review acceptance remains separate.
+
+### Stage 2 execution — 2026-10-16
+
+- Committed Stage 1 as **`ce8ea21` — `Show still-air timing for every mission leg`** before Stage 2 source edits. The commit includes I-011 planning/exploration/glossary context and the delivered schedule, while leaving the owner's pre-existing archive moves and their two README/IDEAS link changes outside the commit. Removed three Markdown trailing-space warnings before finalizing that commit. No Stage 2 commit or Stage 3 authorization is inferred from the owner's earlier continuation.
+- Added pure `MissionLegTiming` with a selected context, one advancing Undo context, compensated distance accumulation, exact expiry timestamps, first-Play policy handling, zero/invalid/unselected display states, and geometric next-leg previews. `FlightSession` owns it and supplies only accepted simulated duration and airspeed after the existing chart-exit calculation. Wall-to-simulated-time conversion, trajectory evaluation, recording, clock compensation, and exit solving retain their existing path. Leaving a mission now closes timing actions and rejects later stale Play/ticks; Fly Again creates fresh timing state.
+- Added the generic empty-by-default flight-status slot to MapView and reserved **56 points** for supplied mission timing. The mission panel shows the original schedule, updated reach, Start/Restart, and one Undo separately from checkboxes. The strip remains between chart and cockpit with either panel state. No cockpit sizing or app minimum size changed. Free Flight/Practice keep the empty slot. No timing data removes strip/actions; invalid supplied timing shows its reason without blocking ordinary flight.
+- Added four Debug-only in-memory presets with a picker that resets the shared runner. Repeated long endpoint labels have distinct leg ordinals. The manual preset starts away from its chart origin and never infers a selection. No app scenes, production catalog, bundled data, dependencies, project settings, existing fixtures, or tolerance changes.
+- Final full suite: `xcodebuild test -project 'Xcode Proj/VOR Vocational.xcodeproj' -scheme 'VOR Vocational' -destination 'platform=macOS' -derivedDataPath /tmp/VOR-I011-DerivedData` using approved local signing access: **73 tests, 0 failures**, `TEST SUCCEEDED`. Log: `/tmp/VOR-I011-stage2-test.log`. Final Debug build used the command in **Verification commands** with the same settings: **BUILD SUCCEEDED**. Log: `/tmp/VOR-I011-stage2-debug.log`. Release remains a Stage 3 check.
+- Passing independent numerical cases: 20 NM with **300 s at 120 kt** then 240 kt retains **10 NM / 150 s**; it expires at **450 s** and reports **45 s past** at 495. Undo after starting B and flying **60 s at 240 kt** restores A with **14 NM estimated travel / 6 NM remaining / 90 s**, and a later inactive interval preserves A's **450 s** expiry. A **0.071-NM** leg at 120 kt expires analytically at **2.13 s** inside a 10-second advance. Straight and curved exit/re-entry cases advance timing only through **15 s** and **10 s** accepted flight time respectively.
+- New hour-long comparisons cover regular/irregular ticks at **1×, 5×, 10×, and 30×**, with 60 speed/heading phases including 0 kt. Independent arithmetic yields **135 NM** estimated travel; unexpired remaining/reach and a separate fractional expiry agree within **1e-6 NM / 1e-6 s**. Recording timestamps remain exactly **0…3600**. All existing motion, recording, crossing, NAV, and debrief checks remain green without widened assertions. Separate tests cover startup precedence/Undo, paused starts/restarts, final-leg next omission, missing/invalid inputs, zero speed with wind drift, post-expiry speed edits, completion before Play, retry, leaving, simulation failure, and independence from checklist/timing actions, wind, heading, and start position.
+- Restarted the built Debug app to replace the older running Stage 1 process. Visually checked Transport at full-screen size: Not started before Play, leg-1 countdown, hidden-panel strip, Pause, selecting the final geometric leg while paused, orange approach style, **Past still-air estimate** count-up, Undo back to leg 1, 0-kt unavailable current/next estimates, Flight Complete opening the unscored debrief with unchecked instructions, and Fly Again resetting to Not started with Undo disabled. True aircraft position and planned route stay hidden in the live mission.
+- Mission Runner Preview produced full-resolution **2200×1584-pixel** captures at its minimum window (1100×792 points including title bar; **1100×760 content**). Its preset selector consumes additional height above the shared flight surface, so that surface has less vertical space than the normal minimum main window. Verified readable strip/cockpit with panel open and hidden, long/repeated labels, scrolling to timing actions and Flight Complete, manual selection prompt, absent timing omitting strip/actions, invalid timing showing its reason with ordinary flight controls, and preset changes resetting clock/checklist/timing. The 56-point strip required no adjustment. The automation reached this preview via its Window-menu entry; the source-defined Debug command and app scenes remain unchanged.
+- **Remaining visual limit:** an exact 1100×760 main Transport window was not established by automation; owner review there remains useful. The earlier Stage 1 synthetic Xcode preview rendering and I-003's separate review are not claimed accepted. Minimum-size shared-runner evidence above replaces the earlier unavailable alternate-window capture for this feature only.
+- Final `git diff --check`, the new model's whitespace/newline check, and all **12 local document links** passed. Left Mission Runner Preview on the timed 20-NM/4-NM preset, paused before first Play, with its panel visible. **Waiting at the Stage 2 commit point for owner review and commit/proceed choice. Stage 3 automatic playback return is not implemented.**
+
+### Stage 2 panel revision — 2026-10-16
+
+- Owner paused further feature work to remove the duplicate timing/NAV lists. Updated the interface contract above before implementation. No Stage 3 work, commit, or unrelated archive change was made.
+- Added explicit optional timing-leg associations to mission instructions and the route briefing adapter. Transport maps all five geometric legs onto its existing five instructions; the final Elmstead reference keeps `nil` instruction distance and its original guidance, with a separate label identifying the planned intersection-to-airport timing inside that same card. Briefing and launched flight use the same instruction values.
+- Replaced production schedule/NAV lists with shared combined cards in both briefing and live mission. Cards include NAV guidance, original distance/duration/reach, and live Start/Restart plus current/next estimates where relevant. Live checkboxes remain independent, Undo stays in a compact header, and the persistent 56-point strip remains. Removed the large repeated current/next panel summary and moved explanatory header copy to help text to reduce scrolling.
+- Shared composition follows explicit leg ordinals, displays each timing leg once, and preserves original instruction/checklist indices. Equal counts or repeated labels never infer relationships. Missing/invalid associations do not attach fabricated timing; unassociated geometric legs remain separate cards within the same list, without invented NAV guidance or checkboxes. Debug presets now supply their associations explicitly.
+- Final full test command: `xcodebuild test -project 'Xcode Proj/VOR Vocational.xcodeproj' -scheme 'VOR Vocational' -destination 'platform=macOS' -derivedDataPath /tmp/VOR-I011-DerivedData`, using existing signing settings and approved local access: **77 tests, 0 failures**, `TEST SUCCEEDED`. Log: `/tmp/VOR-I011-panel-test.log`. Four added tests cover Transport's five-card mapping/final-reference separation, no implicit count/name matching or repeated timing blocks, absent/invalid timing, and preserving an unguided final leg without another checkbox. Existing timing, movement, recording, NAV, and debrief tests remain unchanged and green.
+- Final Debug build used the same project/scheme/destination/derived-data path with `-configuration Debug`: **BUILD SUCCEEDED**. Log: `/tmp/VOR-I011-panel-debug.log`. No dependencies, project settings, source chart data, fixtures, or tolerances changed. The timing model and session advancement were not changed by this presentation revision.
+- Restarted the Debug app and visually checked Transport's briefing and live list in full screen. Each NAV instruction now includes its planned timing; selecting leg 2 shows its guidance, countdown, updated reach, and Restart within the same outlined card, with the next estimate in card 3. Checking instruction 1 left timing unstarted; selecting leg 2 retained that check. Final compact-header build was also inspected in the minimum-size Mission Runner Preview, including both panel states, a checkbox edit, Start/Restart, Undo, final-leg next omission, and scroll access to Flight Complete. No duplicate schedule list appears in either production screen.
+- Final `git diff --check`, the new timing model's whitespace/newline check, and all **12 local document links** passed. The prior exact-minimum-main-Transport window limit remains; the shared compact preview is verified. After closing that preview, app-control tools timed out while trying to refocus the main window, so no final visible Transport state is claimed. The verified Debug build remains at `/tmp/VOR-I011-DerivedData/Build/Products/Debug/VOR Vocational.app`; run it and choose Missions → Transport to review both lists. Return to the Stage 2 owner review checkpoint with Stage 3 on hold and all Stage 2/revision changes uncommitted.
+
+- Owner subsequently requested **“Commit and proceed”**: commit Stage 2 with the combined instruction/timing cards, then implement Stage 3. Existing visual limits remain recorded; this does not accept I-003 or authorize committing its separate archive moves.

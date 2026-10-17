@@ -6,11 +6,11 @@ Each entry is one individually addressable idea. Refer to its ID—for example, 
 
 ### I-011 — Mission leg timing
 
-**Status:** Stage 1 accepted for commit; Stage 2 authorized
+**Status:** Stage 2 accepted for commit; Stage 3 authorized
 **Type:** Feature
-**Next action:** Commit Stage 1, then implement and verify Stage 2 live timing through its owner checkpoint
+**Next action:** Commit Stage 2, then implement and verify the optional one-time playback return through the final checkpoint
 
-**What it is:** Stage 1 now shows a fixed still-air schedule for every geometric leg in the Transport briefing, separately from NAV guidance, and carries it into the shared mission definition. Live current/next estimates, Start/Restart/Undo, the persistent strip, and optional one-time return to 1× remain later stages. All estimates use airspeed and player-declared progress without hidden aircraft position; wind correction is reserved for a later flight-planning skill.
+**What it is:** The briefing and live mission now use one instruction list with each step's NAV guidance and timing together. Stage 2 adds current/next estimates inside the relevant cards, Start/Restart/Undo, exact expiry with a count-up, and a persistent strip above the cockpit. Stage 3 still adds the optional one-time return to 1×. All estimates use airspeed and player-declared progress without hidden aircraft position; wind correction is reserved for a later flight-planning skill.
 
 **Exploration:** [Timing options and open questions](Explorations/I-011-mission-leg-timing.md)
 

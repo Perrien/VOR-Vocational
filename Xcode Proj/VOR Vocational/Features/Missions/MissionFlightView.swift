@@ -34,7 +34,11 @@ struct MissionFlightView: View {
             } else {
                 MapView(session: session, configuration: .mission,
                         sidePanelTitle: "Mission", isSidePanelPresented: $showsMissionPanel,
-                        sidePanel: { missionCard })
+                        flightStatusHeight: mission.timingSchedule == nil ? 0 : 56,
+                        sidePanel: { missionCard },
+                        flightStatus: {
+                            if let display = session.timingDisplay { MissionTimingStrip(display: display) }
+                        })
                     .id(ObjectIdentifier(session))
                     .overlay(alignment: .topLeading) {
                         HStack(spacing: 10) {
@@ -51,7 +55,7 @@ struct MissionFlightView: View {
         .ignoresSafeArea()
         .onAppear { diagnosticsStore.activeSession = session }
         .onDisappear {
-            session.isFlying = false
+            session.leaveMission()
             if diagnosticsStore.activeSession === session { diagnosticsStore.activeSession = nil }
         }
     }
@@ -60,17 +64,25 @@ struct MissionFlightView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(mission.title).font(.headline.weight(.bold))
                 .foregroundStyle(ControlPalette.primaryText)
+            if session.legTiming != nil {
+                Divider()
+                MissionTimingPanel(session: session)
+            }
             if !mission.instructions.isEmpty {
                 Divider()
                 Text("\(progress.completedInstructionIndices.count) OF \(mission.instructions.count) STEPS COMPLETE")
                     .font(.caption2.weight(.bold).monospacedDigit())
                     .foregroundStyle(ControlPalette.accent)
-                Text("Check off steps as you complete them. Clear a check to revisit a step.")
-                    .font(.caption).foregroundStyle(ControlPalette.secondaryText)
-                ForEach(Array(mission.instructions.enumerated()), id: \.offset) { index, step in
-                    instructionRow(step, at: index)
-                }
+                    .help("Check or clear any step independently. Checkmarks never change leg timing.")
             }
+            MissionInstructionListView(instructions: mission.instructions, schedule: mission.timingSchedule,
+                display: session.timingDisplay, selectedLegIndex: session.legTiming?.selectedContext?.legIndex,
+                actionsAreEnabled: session.canAdjustMissionTiming,
+                onStartLeg: { session.startMissionLeg(at: $0) },
+                completion: { index in
+                    Binding(get: { progress.isInstructionComplete(at: index) },
+                            set: { progress.setInstructionComplete($0, at: index) })
+                })
             if let error = session.simulationError {
                 Text(error).font(.caption).foregroundStyle(.red)
             }
@@ -90,34 +102,6 @@ struct MissionFlightView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func instructionRow(_ step: MissionInstruction, at index: Int) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Toggle(isOn: Binding(get: { progress.isInstructionComplete(at: index) },
-                                 set: { progress.setInstructionComplete($0, at: index) })) {
-                Text("\(index + 1). \(step.title)")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ControlPalette.primaryText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .toggleStyle(.checkbox)
-            VStack(alignment: .leading, spacing: 4) {
-                if let guidance = step.guidance {
-                    Text("Tune \(guidance.stationIdent) \(String(format: "%.2f", guidance.frequencyMHz))")
-                        .font(.caption.monospacedDigit()).foregroundStyle(ControlPalette.secondaryText)
-                    Text("Set OBS \(String(format: "%03d", guidance.obsDegrees))° · Confirm \(guidance.flag.rawValue)")
-                        .font(.caption.monospacedDigit().weight(.semibold))
-                        .foregroundStyle(ControlPalette.primaryText)
-                }
-                if let detail = step.detail {
-                    Text(detail).font(.caption).foregroundStyle(ControlPalette.secondaryText)
-                }
-            }
-            .padding(.leading, 20)
-        }
-        .padding(10).frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 10))
-    }
-
     private func resultMetric(title: String, value: String) -> some View {
         HStack(alignment: .firstTextBaseline) {
             Text(title).font(.caption2.weight(.bold)).foregroundStyle(ControlPalette.secondaryText)
@@ -132,7 +116,7 @@ struct MissionFlightView: View {
     }
 
     private func flyAgain() {
-        session.isFlying = false
+        session.leaveMission()
         session = session.freshMissionSession()
         progress = MissionFlightProgress(instructionCount: mission.instructions.count)
         showsMissionPanel = true
@@ -140,7 +124,7 @@ struct MissionFlightView: View {
     }
 
     private func leave(_ action: () -> Void) {
-        session.isFlying = false
+        session.leaveMission()
         action()
     }
 }
@@ -150,20 +134,55 @@ struct MissionFlightView: View {
 struct MissionRunnerPreviewView: View {
     @State private var diagnosticsStore = FlightDiagnosticsStore()
     @Environment(\.dismissWindow) private var dismissWindow
-    private let destination = MissionChartPoint(name: "Survey endpoint", normalizedPosition: CGPoint(x: 0.6, y: 0.5))
+    @State private var preset: Preset = .timed
+
+    private enum Preset: String, CaseIterable {
+        case timed = "Timed 20-NM route with a 4-NM next leg at 120 kt"
+        case manual = "Manual start away from origin"
+        case noTiming = "No timing"
+        case invalid = "Invalid timing"
+
+        var mission: MissionFlightDefinition {
+            let points = [
+                MissionChartPoint(name: "Training departure airport", normalizedPosition: CGPoint(x: 0.4, y: 0.5)),
+                MissionChartPoint(name: "Repeated radial intersection reference", normalizedPosition: CGPoint(x: 0.44, y: 0.5)),
+                MissionChartPoint(name: "Repeated radial intersection reference", normalizedPosition: CGPoint(x: 0.448, y: 0.5))
+            ]
+            let schedule: MissionTimingSchedule?
+            switch self {
+            case .noTiming: schedule = nil
+            case .invalid:
+                schedule = MissionTimingSchedule(legs: [], planningAirspeedKnots: 120)
+            case .timed, .manual:
+                schedule = MissionTimingSchedule(legs: [
+                    .init(startLabel: points[0].name, endLabel: points[1].name, distanceNM: 20),
+                    .init(startLabel: points[1].name, endLabel: points[2].name, distanceNM: 4)
+                ], planningAirspeedKnots: 120,
+                   startupPolicy: self == .manual ? .manual : .firstLegOnFirstPlay)
+            }
+            return MissionFlightDefinition(
+                id: "timing-preview-\(rawValue)", title: rawValue,
+                initialState: FlightAircraftState(normalizedPosition: self == .manual
+                    ? CGPoint(x: 0.42, y: 0.55) : points[0].normalizedPosition, heading: 90, speedKnots: 120),
+                plannedPoints: points, arrivalReference: points.last,
+                instructions: [MissionInstruction(title: "Establish a position fix using both NAV receivers.", timingLegIndex: 0),
+                               MissionInstruction(title: "Choose when to begin the next leg.", timingLegIndex: 1)],
+                timingSchedule: schedule)
+        }
+    }
 
     var body: some View {
-        MissionFlightView(
-            mission: MissionFlightDefinition(
-                id: "preview-survey", title: "Crosswind survey",
-                initialState: FlightAircraftState(normalizedPosition: CGPoint(x: 0.4, y: 0.4), heading: 90, speedKnots: 120),
-                plannedPoints: [MissionChartPoint(name: "Survey start", normalizedPosition: CGPoint(x: 0.3, y: 0.3)),
-                                destination],
-                arrivalReference: destination,
-                instructions: [MissionInstruction(title: "Establish a position fix using both NAV receivers.")]),
-            conditions: .steady(SteadyWind(fromDegrees: 180, speedKnots: 15)!),
-            onBriefing: closePreview, onMissions: closePreview, onHome: closePreview
-        )
+        VStack(spacing: 0) {
+            Picker("Preview preset (resets flight)", selection: $preset) {
+                ForEach(Preset.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+            }
+            .pickerStyle(.menu).padding(8).frame(maxWidth: 680)
+            MissionFlightView(mission: preset.mission,
+                conditions: .steady(SteadyWind(fromDegrees: 180, speedKnots: 15)!),
+                onBriefing: closePreview, onMissions: closePreview, onHome: closePreview)
+                .id(preset)
+                .clipped()
+        }
         .environment(diagnosticsStore)
     }
 

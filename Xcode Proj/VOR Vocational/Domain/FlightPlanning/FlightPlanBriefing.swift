@@ -13,6 +13,17 @@ nonisolated struct FlightPlanBriefing: Equatable {
     let timingSchedule: MissionTimingSchedule
     let steps: [FlightPlanBriefingStep]
 
+    var instructions: [MissionInstruction] {
+        steps.map { step in
+            MissionInstruction(title: step.title, guidance: step.guidance,
+                detail: step.kind == .terminalReference
+                    ? "Use this practical radial reference to locate \(destinationName); it is not a literal airport course." : nil,
+                timingLegIndex: step.timingLegIndex,
+                timingDetail: step.kind == .terminalReference
+                    ? timingSchedule.legs?.last.map { "Timing: \($0.startLabel) → \($0.endLabel)." } : nil)
+        }
+    }
+
     init(resolvedPlan: ResolvedFlightPlan) {
         planName = resolvedPlan.plan.name
         originName = resolvedPlan.points.first?.name ?? "Origin"
@@ -21,13 +32,14 @@ nonisolated struct FlightPlanBriefing: Equatable {
         stillAirEstimate = resolvedPlan.stillAirEstimate
         timingSchedule = MissionTimingSchedule(resolvedPlan: resolvedPlan)
 
-        var steps = resolvedPlan.legs.compactMap { leg -> FlightPlanBriefingStep? in
+        var steps = resolvedPlan.legs.enumerated().compactMap { index, leg -> FlightPlanBriefingStep? in
             guard let guidance = leg.guidance else { return nil }
             return FlightPlanBriefingStep(
                 kind: .leg,
                 title: "\(leg.start.name) to \(leg.end.name)",
                 distanceNM: leg.distanceNM,
-                guidance: guidance
+                guidance: guidance,
+                timingLegIndex: index
             )
         }
 
@@ -37,7 +49,8 @@ nonisolated struct FlightPlanBriefing: Equatable {
                     kind: .terminalReference,
                     title: "Final position reference near \(destinationName)",
                     distanceNM: nil,
-                    guidance: terminalReference
+                    guidance: terminalReference,
+                    timingLegIndex: resolvedPlan.legs.indices.last
                 )
             )
         }
@@ -59,4 +72,5 @@ nonisolated struct FlightPlanBriefingStep: Equatable {
     /// a position reference, not a fabricated airport leg, so it has no value.
     let distanceNM: Double?
     let guidance: VORGuidance
+    let timingLegIndex: Int?
 }

@@ -658,6 +658,82 @@ final class NavigationCoreTests: XCTestCase {
         XCTAssertGreaterThan(try XCTUnwrap(tiny.legs?.first).plannedDurationSeconds, 0)
     }
 
+    func testTransportInstructionsPresentTimingOnceWithoutInventingReferenceDistance() throws {
+        let resolved = try FlightPlanResolver.resolve(
+            FlightPlanCatalog.load(named: "SilverkeepToMidland"),
+            airports: Airport.myosia, stations: VORStation.myosia,
+            mapWidthNM: 500, mapHeightNM: 500 / (1748.0 / 1254.0), cruiseSpeedKnots: 260)
+        let briefing = FlightPlanBriefing(resolvedPlan: resolved)
+        let mission = MissionFlightDefinition(resolvedPlan: resolved)
+        XCTAssertEqual(briefing.instructions, mission.instructions)
+        XCTAssertEqual(mission.instructions.map(\.timingLegIndex), [0, 1, 2, 3, 4])
+        let items = MissionInstructionItem.items(instructions: mission.instructions, schedule: mission.timingSchedule)
+        XCTAssertEqual(items.count, 5)
+        XCTAssertEqual(items.compactMap(\.instructionIndex), [0, 1, 2, 3, 4])
+        XCTAssertEqual(items.compactMap { $0.timingLeg?.index }, [0, 1, 2, 3, 4])
+        XCTAssertNil(briefing.steps[4].distanceNM)
+        XCTAssertEqual(briefing.steps[4].kind, .terminalReference)
+        XCTAssertNotNil(mission.instructions[4].timingDetail)
+        XCTAssertEqual(items[4].timingLeg?.endLabel, "Midland Cityport")
+        XCTAssertEqual(try XCTUnwrap(items[4].timingLeg).distanceNM, resolved.legs[4].distanceNM, accuracy: 1e-6)
+        assertGuidance(mission.instructions[4].guidance,
+                       ident: "ELS", frequencyMHz: 112, obsDegrees: 353, flag: .from)
+    }
+
+    func testInstructionTimingAssociationsDoNotInferPairsOrDuplicateLegs() throws {
+        let schedule = MissionTimingSchedule(legs: [
+            .init(startLabel: "Same label", endLabel: "Same label", distanceNM: 20),
+            .init(startLabel: "Same label", endLabel: "Same label", distanceNM: 4),
+            .init(startLabel: "Same label", endLabel: "Same label", distanceNM: 2)
+        ], planningAirspeedKnots: 120)
+        let unassociated = (0..<3).map { _ in MissionInstruction(title: "Same label") }
+        let separate = MissionInstructionItem.items(instructions: unassociated, schedule: schedule)
+        XCTAssertEqual(separate.count, 6) // Equal counts/names provide no association.
+        XCTAssertTrue(separate.prefix(3).allSatisfy { $0.timingLeg == nil })
+        let instructions = [
+            MissionInstruction(title: "A non-travel setup instruction"),
+            MissionInstruction(title: "An explicit later-leg instruction", timingLegIndex: 2),
+            MissionInstruction(title: "Another cue for the same leg", timingLegIndex: 2),
+            MissionInstruction(title: "Invalid association", timingLegIndex: -1),
+            MissionInstruction(title: "Out-of-range association", timingLegIndex: 99)
+        ]
+        let items = MissionInstructionItem.items(instructions: instructions, schedule: schedule)
+        XCTAssertEqual(items.compactMap(\.instructionIndex), Array(0..<5))
+        XCTAssertEqual(items.compactMap { $0.timingLeg?.index }, [2, 0, 1])
+        XCTAssertNil(items[2].timingLeg)
+        XCTAssertEqual(items.filter { $0.instructionIndex == nil }.count, 2)
+        XCTAssertEqual(Set(items.map(\.id)).count, items.count)
+    }
+
+    func testCombinedInstructionsPreserveUntimedAndUnavailableMissions() {
+        let instructions = [MissionInstruction(title: "Setup"),
+                            MissionInstruction(title: "Navigate", timingLegIndex: 0)]
+        for schedule in [nil, MissionTimingSchedule(legs: [], planningAirspeedKnots: 120)] {
+            let items = MissionInstructionItem.items(instructions: instructions, schedule: schedule)
+            XCTAssertEqual(items.count, 2)
+            XCTAssertEqual(items.compactMap(\.instructionIndex), [0, 1])
+            XCTAssertTrue(items.allSatisfy { $0.timingLeg == nil })
+        }
+    }
+
+    func testCombinedInstructionsRetainAnUnguidedFinalLegWithoutAddingACheckbox() throws {
+        let supplied = try FlightPlanCatalog.load(named: "SilverkeepToMidland")
+        let withoutReference = FlightPlan(id: "in-memory-no-reference", name: "No terminal reference",
+            origin: supplied.origin, waypoints: supplied.waypoints, destination: supplied.destination,
+            terminalReference: nil)
+        let resolved = try FlightPlanResolver.resolve(withoutReference,
+            airports: Airport.myosia, stations: VORStation.myosia,
+            mapWidthNM: 500, mapHeightNM: 500 / (1748.0 / 1254.0), cruiseSpeedKnots: 260)
+        let mission = MissionFlightDefinition(resolvedPlan: resolved)
+        let items = MissionInstructionItem.items(instructions: mission.instructions, schedule: mission.timingSchedule)
+        XCTAssertEqual(mission.instructions.count, 4)
+        XCTAssertEqual(items.count, 5)
+        XCTAssertEqual(items.compactMap(\.instructionIndex), [0, 1, 2, 3])
+        XCTAssertNil(items.last?.instructionIndex)
+        XCTAssertEqual(items.last?.timingLeg?.index, 4)
+        XCTAssertEqual(items.last?.timingLeg?.endLabel, "Midland Cityport")
+    }
+
     func testInMemoryRouteAt120KnotsHasTimingWithoutTerminalReference() throws {
         let plan = FlightPlan(id: "twenty-nm", name: "Synthetic route", origin: .airport(icao: "GNEW"),
                               waypoints: [], destination: .vor(stationID: "NEW"), terminalReference: nil)
@@ -776,6 +852,352 @@ final class NavigationCoreTests: XCTestCase {
             XCTAssertEqual(MissionTimingFormat.duration(invalid), "Timing unavailable")
         }
         XCTAssertFalse(MissionTimingFormat.duration(.greatestFiniteMagnitude).isEmpty)
+    }
+
+    @MainActor
+    func testLiveTimingUsesPiecewiseAirspeedAndRetainsExactExpiry() throws {
+        let session = FlightSession(mission: makeTimingMission(), conditions: .calm)
+        let schedule = session.mission?.timingSchedule
+        XCTAssertEqual(session.timingDisplay?.current, .notStarted)
+        XCTAssertNil(session.legTiming?.selectedContext)
+        XCTAssertEqual(session.timingDisplay?.nextDuration, .available(120))
+        session.isFlying = true
+        session.advance(wallElapsed: 300)
+        session.speedKnots = 240
+        XCTAssertEqual(session.legTiming?.selectedContext?.estimatedDistanceNM, 10)
+        XCTAssertEqual(session.timingDisplay?.current, .remaining(seconds: 150, reachSeconds: 450))
+        XCTAssertEqual(session.timingDisplay?.nextDuration, .available(60))
+        session.isFlying = false
+        let paused = session.timingDisplay
+        session.advance(wallElapsed: 10_000)
+        XCTAssertEqual(session.timingDisplay, paused)
+        session.isFlying = true
+        XCTAssertEqual(session.legTiming?.selectedContext?.startedAtSeconds, 0)
+        session.advance(wallElapsed: 150)
+        XCTAssertEqual(session.legTiming?.selectedContext?.expirySeconds, 450)
+        session.advance(wallElapsed: 45)
+        XCTAssertEqual(session.timingDisplay?.current, .pastEstimate(seconds: 45, reachSeconds: 450))
+        session.speedKnots = 30
+        XCTAssertEqual(session.timingDisplay?.current, .pastEstimate(seconds: 45, reachSeconds: 450))
+        XCTAssertEqual(session.mission?.timingSchedule, schedule)
+
+        let fractional = FlightSession(mission: makeTimingMission(distances: [0.071]), conditions: .calm)
+        fractional.isFlying = true
+        fractional.advance(wallElapsed: 10)
+        XCTAssertEqual(try XCTUnwrap(fractional.legTiming?.selectedContext?.expirySeconds), 2.13, accuracy: 1e-6)
+        guard case .pastEstimate(let past, let reach) = fractional.timingDisplay?.current else {
+            return XCTFail("Expected exact past-estimate event")
+        }
+        XCTAssertEqual(reach, 2.13, accuracy: 1e-6)
+        XCTAssertEqual(past, 7.87, accuracy: 1e-6)
+    }
+
+    @MainActor
+    func testTimingStartupPrecedencePausedSelectionAndOneLevelUndo() {
+        let session = FlightSession(mission: makeTimingMission(), conditions: .calm)
+        session.startMissionLeg(at: 1)
+        XCTAssertEqual(session.legTiming?.selectedContext?.legIndex, 1)
+        XCTAssertNil(session.timingDisplay?.nextLeg)
+        session.advance(wallElapsed: 50)
+        XCTAssertEqual(session.legTiming?.selectedContext?.estimatedDistanceNM, 0)
+        session.undoMissionLegStart()
+        XCTAssertNil(session.legTiming?.selectedContext)
+        XCTAssertEqual(session.legTiming?.canUndo, false)
+        session.isFlying = true
+        XCTAssertEqual(session.legTiming?.selectedContext?.legIndex, 0)
+        XCTAssertEqual(session.legTiming?.canUndo, false)
+        session.isFlying = false
+        session.startMissionLeg(at: 1)
+        session.isFlying = true
+        XCTAssertEqual(session.legTiming?.selectedContext?.legIndex, 1)
+        session.advance(wallElapsed: 30)
+        session.startMissionLeg(at: 1) // Restart from now.
+        XCTAssertEqual(session.legTiming?.selectedContext?.startedAtSeconds, 30)
+        XCTAssertEqual(session.legTiming?.selectedContext?.estimatedDistanceNM, 0)
+        session.undoMissionLegStart()
+        XCTAssertEqual(session.legTiming?.selectedContext?.startedAtSeconds, 0)
+        XCTAssertEqual(session.legTiming?.selectedContext?.estimatedDistanceNM, 1)
+        session.undoMissionLegStart()
+        XCTAssertEqual(session.legTiming?.selectedContext?.legIndex, 1)
+        session.startMissionLeg(at: -1)
+        session.startMissionLeg(at: 2)
+        XCTAssertEqual(session.legTiming?.canUndo, false)
+
+        let explicitFirst = FlightSession(mission: makeTimingMission(), conditions: .calm)
+        explicitFirst.startMissionLeg(at: 1)
+        explicitFirst.isFlying = true
+        XCTAssertEqual(explicitFirst.legTiming?.selectedContext?.legIndex, 1)
+        explicitFirst.undoMissionLegStart()
+        explicitFirst.isFlying = false
+        explicitFirst.isFlying = true
+        XCTAssertNil(explicitFirst.legTiming?.selectedContext)
+        XCTAssertEqual(explicitFirst.timingDisplay?.current, .selectLeg)
+
+        let manual = FlightSession(mission: makeTimingMission(policy: .manual), conditions: .calm)
+        manual.isFlying = true
+        manual.advance(wallElapsed: 45)
+        XCTAssertEqual(manual.timingDisplay?.current, .selectLeg)
+        XCTAssertNil(manual.timingDisplay?.nextLeg)
+        manual.isFlying = false
+        manual.startMissionLeg(at: 1)
+        XCTAssertEqual(manual.legTiming?.selectedContext?.startedAtSeconds, 45)
+        XCTAssertEqual(manual.timingDisplay?.current, .remaining(seconds: 120, reachSeconds: 165))
+    }
+
+    @MainActor
+    func testUndoAdvancesSavedContextAcrossSpeedChangesAndExpiry() throws {
+        let session = FlightSession(mission: makeTimingMission(distances: [20, 5]), conditions: .calm)
+        session.isFlying = true
+        session.advance(wallElapsed: 300)
+        session.startMissionLeg(at: 1)
+        session.speedKnots = 240
+        session.advance(wallElapsed: 60)
+        session.undoMissionLegStart()
+        XCTAssertEqual(session.legTiming?.selectedContext?.estimatedDistanceNM, 14)
+        XCTAssertEqual(session.timingDisplay?.current, .remaining(seconds: 90, reachSeconds: 450))
+        XCTAssertEqual(session.legTiming?.canUndo, false)
+        session.startMissionLeg(at: 1)
+        session.advance(wallElapsed: 135)
+        session.undoMissionLegStart()
+        XCTAssertEqual(session.timingDisplay?.current, .pastEstimate(seconds: 45, reachSeconds: 450))
+        XCTAssertEqual(session.legTiming?.selectedContext?.legIndex, 0)
+        // A later manual start replaces the only saved context.
+        session.startMissionLeg(at: 1)
+        session.startMissionLeg(at: 1)
+        session.advance(wallElapsed: 5)
+        session.undoMissionLegStart()
+        XCTAssertEqual(session.legTiming?.selectedContext?.legIndex, 1)
+        XCTAssertEqual(try XCTUnwrap(session.legTiming?.selectedContext?.estimatedDistanceNM), 1.0 / 3, accuracy: 1e-6)
+    }
+
+    @MainActor
+    func testZeroAirspeedPreservesProgressAndPastEstimateKeepsCounting() throws {
+        let wind = FlightConditions.steady(try XCTUnwrap(SteadyWind(fromDegrees: 270, speedKnots: 20)))
+        let session = FlightSession(mission: makeTimingMission(), conditions: wind)
+        session.isFlying = true
+        session.advance(wallElapsed: 300)
+        session.speedKnots = 0
+        let position = session.normalizedAircraftPosition
+        session.advance(wallElapsed: 60)
+        XCTAssertNotEqual(session.normalizedAircraftPosition, position)
+        XCTAssertEqual(session.legTiming?.selectedContext?.estimatedDistanceNM, 10)
+        XCTAssertEqual(session.timingDisplay?.current, .zeroAirspeed)
+        XCTAssertEqual(session.timingDisplay?.nextDuration, .zeroAirspeed)
+        session.speedKnots = 240
+        XCTAssertEqual(session.timingDisplay?.current, .remaining(seconds: 150, reachSeconds: 510))
+        session.advance(wallElapsed: 150)
+        session.speedKnots = 0
+        session.advance(wallElapsed: 45)
+        XCTAssertEqual(session.timingDisplay?.current, .pastEstimate(seconds: 45, reachSeconds: 510))
+        session.isFlying = false
+        session.advance(wallElapsed: 45)
+        XCTAssertEqual(session.timingDisplay?.current, .pastEstimate(seconds: 45, reachSeconds: 510))
+    }
+
+    @MainActor
+    func testTimingUnavailableInputsDoNotInventProgressOrChangeSessionGuards() throws {
+        let session = FlightSession(mission: makeTimingMission(), conditions: .calm)
+        session.isFlying = true
+        for invalid in [Double.nan, .infinity, -.infinity, -1] {
+            session.speedKnots = invalid
+            XCTAssertEqual(session.timingDisplay?.current, .unavailable)
+            XCTAssertEqual(session.timingDisplay?.nextDuration, .unavailable)
+            session.advance(wallElapsed: 30)
+            XCTAssertEqual(session.elapsedSimulatedSeconds, 0)
+            XCTAssertEqual(session.legTiming?.selectedContext?.estimatedDistanceNM, 0)
+            XCTAssertEqual(session.recording?.samples.count, 1)
+        }
+        session.speedKnots = .leastNonzeroMagnitude
+        XCTAssertEqual(session.timingDisplay?.current, .unavailable) // Derived time overflows.
+        session.speedKnots = 120
+        XCTAssertEqual(session.timingDisplay?.current, .remaining(seconds: 600, reachSeconds: 600))
+        let invalidTiming = MissionTimingSchedule(legs: [], planningAirspeedKnots: 120)
+        let definition = MissionFlightDefinition(id: "invalid-timing", title: "Still flyable",
+            initialState: makeTimingMission().initialState, timingSchedule: invalidTiming)
+        let invalid = FlightSession(mission: definition, conditions: .calm)
+        invalid.startMissionLeg(at: 0)
+        invalid.isFlying = true
+        invalid.advance(wallElapsed: 10)
+        XCTAssertEqual(invalid.timingDisplay?.current, .unavailable)
+        XCTAssertNil(invalid.legTiming?.selectedContext)
+        XCTAssertEqual(invalid.elapsedSimulatedSeconds, 10)
+        XCTAssertNotNil(invalid.completeMission())
+        let absent = FlightSession(mission: MissionFlightDefinition(id: "absent", title: "No schedule",
+            initialState: definition.initialState), conditions: .calm)
+        absent.startMissionLeg(at: 0)
+        XCTAssertNil(absent.legTiming)
+        XCTAssertNil(absent.timingDisplay)
+    }
+
+    @MainActor
+    func testTimingStopsOnCompletionFailureAndLeavingAndRetryResets() throws {
+        let mission = makeTimingMission()
+        let beforePlay = FlightSession(mission: mission, conditions: .calm)
+        beforePlay.completeMission()
+        beforePlay.startMissionLeg(at: 1)
+        beforePlay.isFlying = true
+        XCTAssertFalse(beforePlay.isFlying)
+        XCTAssertNil(beforePlay.legTiming?.selectedContext)
+        XCTAssertEqual(beforePlay.legTiming?.hasHandledFirstPlay, false)
+
+        let session = FlightSession(mission: mission, conditions: .calm)
+        session.isFlying = true
+        session.advance(wallElapsed: 50)
+        session.startMissionLeg(at: 1)
+        session.completeMission()
+        let completedTiming = session.legTiming
+        session.undoMissionLegStart()
+        session.startMissionLeg(at: 0)
+        session.advance(wallElapsed: 50)
+        XCTAssertEqual(session.legTiming, completedTiming)
+        let retry = session.freshMissionSession()
+        XCTAssertNil(retry.legTiming?.selectedContext)
+        XCTAssertEqual(retry.legTiming?.canUndo, false)
+        XCTAssertEqual(retry.legTiming?.hasHandledFirstPlay, false)
+        XCTAssertEqual(retry.timingDisplay?.current, .notStarted)
+        XCTAssertEqual(retry.mission?.timingSchedule, mission.timingSchedule)
+        retry.isFlying = true
+        retry.advance(wallElapsed: 10)
+        retry.leaveMission()
+        let leftTiming = retry.legTiming
+        retry.isFlying = true
+        retry.startMissionLeg(at: 1)
+        retry.advance(wallElapsed: 50)
+        XCTAssertFalse(retry.isFlying)
+        XCTAssertFalse(retry.canAdjustMissionTiming)
+        XCTAssertEqual(retry.legTiming, leftTiming)
+        XCTAssertEqual(retry.elapsedSimulatedSeconds, 10)
+
+        let badStart = FlightAircraftState(normalizedPosition: CGPoint(x: 1.1, y: 0.5), speedKnots: 120)
+        let failure = FlightSession(mission: makeTimingMission(initial: badStart), conditions: .calm)
+        failure.isFlying = true
+        failure.advance(wallElapsed: 10)
+        let failedTiming = failure.legTiming
+        XCTAssertNotNil(failure.simulationError)
+        failure.startMissionLeg(at: 1)
+        failure.undoMissionLegStart()
+        XCTAssertEqual(failure.legTiming, failedTiming)
+        XCTAssertEqual(failure.elapsedSimulatedSeconds, 0)
+    }
+
+    @MainActor
+    func testTimingOnlyAdvancesThroughAcceptedStraightAndCurvedChartExit() throws {
+        for curve in [false, true] {
+            let initial = FlightAircraftState(normalizedPosition: curve
+                ? CGPoint(x: 0.5, y: (1 / Double.pi) / FlightWorld.heightNM) : CGPoint(x: 0.999, y: 0.5),
+                heading: curve ? 0 : 90, speedKnots: 120)
+            let session = FlightSession(mission: makeTimingMission(initial: initial), conditions: .calm)
+            session.selectedHeading = curve ? 180 : 90
+            session.isFlying = true
+            session.timeMultiplier = 30
+            session.advance(wallElapsed: 20)
+            let expectedTime = curve ? 10.0 : 15.0
+            XCTAssertEqual(session.completion?.ending, .leftChart)
+            XCTAssertEqual(session.elapsedSimulatedSeconds, expectedTime, accuracy: 1e-6)
+            XCTAssertEqual(try XCTUnwrap(session.legTiming?.selectedContext?.estimatedDistanceNM),
+                           120 * expectedTime / 3_600, accuracy: 1e-6)
+            XCTAssertNil(session.legTiming?.selectedContext?.expirySeconds)
+            let saved = session.legTiming
+            session.advance(wallElapsed: 1_000)
+            XCTAssertEqual(session.legTiming, saved)
+        }
+    }
+
+    @MainActor
+    func testTimingIsIndependentOfWindHeadingPositionAndChecklist() throws {
+        let windy = FlightConditions.steady(try XCTUnwrap(SteadyWind(fromDegrees: 270, speedKnots: 25)))
+        let a = FlightSession(mission: makeTimingMission(), conditions: .calm)
+        let b = FlightSession(mission: makeTimingMission(initial: FlightAircraftState(
+            normalizedPosition: CGPoint(x: 0.3, y: 0.4), heading: 210, speedKnots: 120)), conditions: windy)
+        for session in [a, b] {
+            session.isFlying = true
+            session.advance(wallElapsed: 300)
+            session.speedKnots = 240
+            session.advance(wallElapsed: 60)
+        }
+        XCTAssertNotEqual(a.aircraftState, b.aircraftState)
+        XCTAssertEqual(a.timingDisplay, b.timingDisplay)
+
+        let control = FlightSession(mission: makeTimingMission(), conditions: .calm)
+        let edited = FlightSession(mission: makeTimingMission(), conditions: .calm)
+        var checklist = MissionFlightProgress(instructionCount: 2)
+        for index in 0..<20 {
+            edited.startMissionLeg(at: index % 2)
+            if index % 3 == 0 { edited.undoMissionLegStart() }
+            checklist.setInstructionComplete(index % 2 == 0, at: index % 2)
+            for session in [control, edited] {
+                session.selectedHeading = Double(index * 17)
+                session.speedKnots = index % 2 == 0 ? 120 : 240
+                session.timeMultiplier = 5
+                session.isFlying = true
+                session.advance(wallElapsed: 2)
+            }
+            XCTAssertEqual(edited.aircraftState, control.aircraftState)
+            XCTAssertEqual(edited.nav1, control.nav1)
+            XCTAssertEqual(edited.nav2, control.nav2)
+            XCTAssertEqual(edited.timeMultiplier, control.timeMultiplier)
+            XCTAssertEqual(edited.selectedHeading, control.selectedHeading)
+            XCTAssertEqual(edited.elapsedSimulatedSeconds, control.elapsedSimulatedSeconds)
+            XCTAssertEqual(edited.recording, control.recording)
+        }
+        XCTAssertEqual(edited.completeMission(), control.completeMission())
+    }
+
+    @MainActor
+    func testOneHourTimingAccuracyAcrossPlaybackAndSpeedPartitions() throws {
+        let shortDistance = 37.123
+        var expectedDistance = 0.0
+        var expectedExpiry: Double?
+        for phase in 0..<60 {
+            let speed = [120.0, 240, 0, 180][phase % 4]
+            let travel = speed * 60 / 3_600
+            if expectedExpiry == nil, expectedDistance + travel >= shortDistance {
+                expectedExpiry = Double(phase * 60) + (shortDistance - expectedDistance) / speed * 3_600
+            }
+            expectedDistance += travel
+        }
+        for distance in [1_000, shortDistance] {
+            var referencePosition: CGPoint?
+            for multiplier in [1.0, 5, 10, 30] {
+                for irregular in [false, true] {
+                    let session = FlightSession(mission: makeTimingMission(distances: [distance, 4]), conditions: .calm)
+                    session.timeMultiplier = multiplier
+                    session.isFlying = true
+                    var tick = 0
+                    for phase in 0..<60 {
+                        session.speedKnots = [120.0, 240, 0, 180][phase % 4]
+                        session.selectedHeading = Double([90, 180, 270, 0][phase % 4])
+                        let targetTime = Double((phase + 1) * 60)
+                        while session.elapsedSimulatedSeconds < targetTime {
+                            let wallStep = irregular ? [0.016, 0.041, 0.003, 0.23, 0.09][tick % 5] : 0.125
+                            let simulated = min(targetTime - session.elapsedSimulatedSeconds, wallStep * multiplier)
+                            session.advance(wallElapsed: simulated / multiplier)
+                            tick += 1
+                            guard session.isFlying else { return XCTFail("Unexpected flight ending") }
+                        }
+                    }
+                    let context = try XCTUnwrap(session.legTiming?.selectedContext)
+                    XCTAssertEqual(session.elapsedSimulatedSeconds, 3_600, accuracy: 1e-6)
+                    XCTAssertEqual(session.recording?.samples.map(\.simulatedSeconds), (0...3_600).map(Double.init))
+                    if distance == 1_000 {
+                        XCTAssertEqual(context.estimatedDistanceNM, expectedDistance, accuracy: 1e-6)
+                        guard case .remaining(let remaining, let reach) = session.timingDisplay?.current else {
+                            return XCTFail("Expected remaining estimate")
+                        }
+                        let expectedRemaining = (distance - expectedDistance) / 180 * 3_600
+                        XCTAssertEqual(remaining, expectedRemaining, accuracy: 1e-6)
+                        XCTAssertEqual(reach, 3_600 + expectedRemaining, accuracy: 1e-6)
+                    } else {
+                        XCTAssertEqual(try XCTUnwrap(context.expirySeconds), try XCTUnwrap(expectedExpiry), accuracy: 1e-6)
+                    }
+                    if let referencePosition {
+                        XCTAssertLessThanOrEqual(VORNavigation.distanceNM(fromNormalized: session.normalizedAircraftPosition,
+                            toNormalized: referencePosition, mapWidthNM: FlightWorld.widthNM,
+                            mapHeightNM: FlightWorld.heightNM), 1e-6)
+                    } else { referencePosition = session.normalizedAircraftPosition }
+                }
+            }
+        }
     }
 
     func testMissionFlightChecklistAllowsIndependentCompletionAndReopening() {
@@ -1596,6 +2018,18 @@ final class NavigationCoreTests: XCTestCase {
                 }
             }
         }
+    }
+
+    private func makeTimingMission(distances: [Double] = [20, 4],
+                                   policy: MissionTimingSchedule.StartupPolicy = .firstLegOnFirstPlay,
+                                   initial: FlightAircraftState? = nil) -> MissionFlightDefinition {
+        MissionFlightDefinition(id: "timed-test", title: "Independent timing inputs",
+            initialState: initial ?? FlightAircraftState(normalizedPosition: CGPoint(x: 0.5, y: 0.5),
+                                                       heading: 90, speedKnots: 120),
+            instructions: [MissionInstruction(title: "First instruction"), MissionInstruction(title: "Second instruction")],
+            timingSchedule: MissionTimingSchedule(legs: distances.map {
+                .init(startLabel: "Repeated label", endLabel: "Repeated label", distanceNM: $0)
+            }, planningAirspeedKnots: 120, startupPolicy: policy))
     }
 
     private struct WindTestGenerator: RandomNumberGenerator {
