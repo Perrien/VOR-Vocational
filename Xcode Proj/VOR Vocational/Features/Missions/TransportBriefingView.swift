@@ -153,8 +153,12 @@ private struct FlightPlanPanel: View {
                 VStack(alignment: .leading, spacing: 14) {
                     summary
                     Divider()
+                    MissionTimingScheduleView(schedule: briefing.timingSchedule)
+                    Divider()
                     MissionWindSetupView(setup: $windSetup)
                     Divider()
+                    Text("NAV instructions")
+                        .font(.headline)
                     ForEach(Array(briefing.steps.enumerated()), id: \.offset) { index, step in
                         FlightPlanStepRow(number: index + 1, step: step)
                     }

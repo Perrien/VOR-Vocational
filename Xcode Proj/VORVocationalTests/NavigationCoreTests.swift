@@ -603,6 +603,181 @@ final class NavigationCoreTests: XCTestCase {
                        ident: "ELS", frequencyMHz: 112, obsDegrees: 353, flag: .from)
     }
 
+    func testTransportTimingIncludesEveryGeometricLegAndPreservesInstructions() throws {
+        let resolved = try FlightPlanResolver.resolve(
+            FlightPlanCatalog.load(named: "SilverkeepToMidland"),
+            airports: Airport.myosia, stations: VORStation.myosia,
+            mapWidthNM: 500, mapHeightNM: 500 / (1748.0 / 1254.0), cruiseSpeedKnots: 260)
+        let briefing = FlightPlanBriefing(resolvedPlan: resolved)
+        let mission = MissionFlightDefinition(resolvedPlan: resolved)
+        let schedule = try XCTUnwrap(mission.timingSchedule)
+        let legs = try XCTUnwrap(schedule.legs)
+
+        XCTAssertEqual(schedule, briefing.timingSchedule)
+        XCTAssertEqual(schedule.planningAirspeedKnots, mission.initialState.speedKnots)
+        XCTAssertEqual(schedule.startupPolicy, .firstLegOnFirstPlay)
+        XCTAssertEqual(legs.count, 5)
+        XCTAssertEqual(legs.map(\.id), [0, 1, 2, 3, 4])
+        XCTAssertEqual(legs.map(\.distanceNM), resolved.legs.map(\.distanceNM))
+        XCTAssertEqual(legs.reduce(0) { $0 + $1.distanceNM }, 99.18027355, accuracy: 0.000_001)
+        let durationSum = legs.reduce(0) { $0 + $1.plannedDurationSeconds }
+        XCTAssertEqual(durationSum, 1_373.2653260866, accuracy: 0.000_001)
+        XCTAssertEqual(try XCTUnwrap(legs.last).plannedReachSeconds, durationSum, accuracy: 0.000_001)
+        XCTAssertEqual(legs[4].startLabel, resolved.points[4].name)
+        XCTAssertEqual(legs[4].endLabel, "Midland Cityport")
+        XCTAssertNil(resolved.legs[4].guidance)
+        XCTAssertEqual(briefing.steps.map(\.kind), [.leg, .leg, .leg, .leg, .terminalReference])
+        XCTAssertEqual(mission.instructions.map(\.guidance), briefing.steps.map { Optional($0.guidance) })
+        XCTAssertNil(briefing.steps[4].distanceNM)
+        assertGuidance(mission.instructions[4].guidance,
+                       ident: "ELS", frequencyMHz: 112, obsDegrees: 353, flag: .from)
+    }
+
+    func testIndependentTimingScheduleUsesUnroundedDurationsAndOrdinalIdentity() throws {
+        let schedule = MissionTimingSchedule(legs: [
+            .init(startLabel: "Repeated fix", endLabel: "Repeated fix", distanceNM: 20),
+            .init(startLabel: "Repeated fix", endLabel: "Repeated fix", distanceNM: 4),
+            .init(startLabel: "Repeated fix", endLabel: "Repeated fix", distanceNM: 0.02),
+            .init(startLabel: "Repeated fix", endLabel: "Repeated fix", distanceNM: 0.02)
+        ], planningAirspeedKnots: 120)
+        let legs = try XCTUnwrap(schedule.legs)
+        XCTAssertEqual(schedule.startupPolicy, .manual)
+        XCTAssertEqual(legs.map(\.number), [1, 2, 3, 4])
+        XCTAssertEqual(Set(legs.map(\.id)).count, 4)
+        for (leg, duration) in zip(legs, [600.0, 120, 0.6, 0.6]) {
+            XCTAssertEqual(leg.plannedDurationSeconds, duration, accuracy: 0.000_001)
+        }
+        for (leg, reach) in zip(legs, [600.0, 720, 720.6, 721.2]) {
+            XCTAssertEqual(leg.plannedReachSeconds, reach, accuracy: 0.000_001)
+        }
+        XCTAssertEqual(MissionTimingFormat.duration(legs[3].plannedReachSeconds), "12:01")
+        // Tiny positive distances remain valid; timing adds no resolver threshold.
+        let tiny = MissionTimingSchedule(legs: [
+            .init(startLabel: "A", endLabel: "B", distanceNM: 0.000_000_1)
+        ], planningAirspeedKnots: 120)
+        XCTAssertGreaterThan(try XCTUnwrap(tiny.legs?.first).plannedDurationSeconds, 0)
+    }
+
+    func testInMemoryRouteAt120KnotsHasTimingWithoutTerminalReference() throws {
+        let plan = FlightPlan(id: "twenty-nm", name: "Synthetic route", origin: .airport(icao: "GNEW"),
+                              waypoints: [], destination: .vor(stationID: "NEW"), terminalReference: nil)
+        let resolved = try FlightPlanResolver.resolve(plan,
+            airports: [makeAirport(icao: "GNEW", x: 0.2, y: 0.5)],
+            stations: [makeStation(identifier: "NEW", x: 0.24, y: 0.5)],
+            mapWidthNM: 500, mapHeightNM: 500, cruiseSpeedKnots: 120)
+        let briefing = FlightPlanBriefing(resolvedPlan: resolved)
+        let mission = MissionFlightDefinition(resolvedPlan: resolved)
+        let leg = try XCTUnwrap(mission.timingSchedule?.legs?.first)
+        XCTAssertEqual(leg.distanceNM, 20, accuracy: 0.000_001)
+        XCTAssertEqual(leg.plannedDurationSeconds, 600, accuracy: 0.000_001)
+        XCTAssertEqual(leg.plannedReachSeconds, 600, accuracy: 0.000_001)
+        XCTAssertEqual(briefing.steps.map(\.kind), [.leg])
+        XCTAssertEqual(mission.timingSchedule, briefing.timingSchedule)
+        XCTAssertEqual(mission.initialState.speedKnots, 120)
+    }
+
+    func testTimingValidationNeverPublishesPartialOrInvalidSchedule() {
+        let valid = MissionTimingSchedule.LegInput(startLabel: "A", endLabel: "B", distanceNM: 20)
+        XCTAssertEqual(MissionTimingSchedule(legs: [], planningAirspeedKnots: 120).availability,
+                       .unavailable(.emptyLegs))
+        for speed in [0, -1, Double.nan, .infinity, -.infinity] {
+            let schedule = MissionTimingSchedule(legs: [valid], planningAirspeedKnots: speed)
+            XCTAssertEqual(schedule.availability, .unavailable(.invalidPlanningAirspeed))
+            XCTAssertNil(schedule.legs)
+        }
+        for distance in [0, -1, Double.nan, .infinity, -.infinity] {
+            let schedule = MissionTimingSchedule(legs: [valid,
+                .init(startLabel: "B", endLabel: "C", distanceNM: distance)
+            ], planningAirspeedKnots: 120)
+            XCTAssertEqual(schedule.availability, .unavailable(.invalidDistance(legNumber: 2)))
+            XCTAssertNil(schedule.legs)
+        }
+        let overflow = MissionTimingSchedule(legs: [
+            .init(startLabel: "A", endLabel: "B", distanceNM: .greatestFiniteMagnitude)
+        ], planningAirspeedKnots: 1)
+        XCTAssertEqual(overflow.availability, .unavailable(.invalidDuration(legNumber: 1)))
+        let underflow = MissionTimingSchedule(legs: [
+            .init(startLabel: "A", endLabel: "B", distanceNM: .leastNonzeroMagnitude)
+        ], planningAirspeedKnots: .greatestFiniteMagnitude)
+        XCTAssertEqual(underflow.availability, .unavailable(.invalidDuration(legNumber: 1)))
+        let cumulativeOverflow = MissionTimingSchedule(legs: [
+            .init(startLabel: "A", endLabel: "B", distanceNM: 1e308),
+            .init(startLabel: "B", endLabel: "C", distanceNM: 1e308)
+        ], planningAirspeedKnots: 3_600)
+        XCTAssertEqual(cumulativeOverflow.availability, .unavailable(.nonFiniteCumulativeTime(legNumber: 2)))
+        XCTAssertNil(cumulativeOverflow.legs)
+    }
+
+    @MainActor
+    func testAbsentAndInvalidTimingDoNotPreventOrdinaryMissionFlight() throws {
+        let initial = FlightAircraftState(normalizedPosition: CGPoint(x: 0.5, y: 0.5), speedKnots: 120)
+        let points = [MissionChartPoint(name: "A", normalizedPosition: CGPoint(x: 0.2, y: 0.5)),
+                      MissionChartPoint(name: "B", normalizedPosition: CGPoint(x: 0.3, y: 0.5))]
+        let instructions = [MissionInstruction(title: "Find a fix")]
+        let absent = MissionFlightDefinition(id: "absent", title: "Absent timing", initialState: initial,
+                                            plannedPoints: points, instructions: instructions)
+        let invalid = MissionFlightDefinition(id: "invalid", title: "Invalid timing", initialState: initial,
+            plannedPoints: points, instructions: instructions,
+            timingSchedule: MissionTimingSchedule(legs: [], planningAirspeedKnots: 120))
+        XCTAssertNil(absent.timingSchedule)
+        XCTAssertEqual(invalid.timingSchedule?.availability, .unavailable(.emptyLegs))
+        let a = FlightSession(mission: absent, conditions: .calm)
+        let b = FlightSession(mission: invalid, conditions: .calm)
+        for session in [a, b] {
+            session.isFlying = true
+            session.advance(wallElapsed: 60)
+            XCTAssertNil(session.simulationError)
+        }
+        XCTAssertEqual(a.aircraftState, b.aircraftState)
+        XCTAssertEqual(a.recording, b.recording)
+        let completion = try XCTUnwrap(b.completeMission())
+        XCTAssertEqual(completion.simulatedElapsedSeconds, 60)
+        XCTAssertEqual(completion.mission.instructions, instructions)
+        XCTAssertEqual(completion.mission.timingSchedule, invalid.timingSchedule)
+    }
+
+    @MainActor
+    func testPlanningScheduleStaysFixedAcrossWindAndCockpitSpeedChanges() throws {
+        let resolved = try FlightPlanResolver.resolve(
+            FlightPlanCatalog.load(named: "SilverkeepToMidland"),
+            airports: Airport.myosia, stations: VORStation.myosia,
+            mapWidthNM: 500, mapHeightNM: 500 / (1748.0 / 1254.0), cruiseSpeedKnots: 260)
+        let mission = MissionFlightDefinition(resolvedPlan: resolved)
+        let original = try XCTUnwrap(mission.timingSchedule)
+        var draft = MissionWindSetup()
+        let calm = try XCTUnwrap(draft.conditions)
+        draft.select(.steady)
+        draft.directionText = "270"
+        draft.speedText = "25"
+        let windy = try XCTUnwrap(draft.conditions)
+        XCTAssertNotEqual(calm, windy)
+        for conditions in [calm, windy] {
+            let session = FlightSession(mission: mission, conditions: conditions)
+            session.speedKnots = 120
+            session.isFlying = true
+            session.advance(wallElapsed: 60)
+            XCTAssertEqual(session.mission?.timingSchedule, original)
+            XCTAssertEqual(session.freshMissionSession().mission?.timingSchedule, original)
+        }
+        draft.select(.calm)
+        XCTAssertEqual(draft.conditions, calm)
+        XCTAssertEqual(FlightPlanBriefing(resolvedPlan: resolved).timingSchedule, original)
+    }
+
+    func testTimingFormattingRoundsOnlyForPresentation() {
+        XCTAssertEqual(MissionTimingFormat.duration(59.49), "0:59")
+        XCTAssertEqual(MissionTimingFormat.duration(59.5), "1:00")
+        XCTAssertEqual(MissionTimingFormat.duration(3_599.5), "1:00:00")
+        XCTAssertEqual(MissionTimingFormat.duration(3_661), "1:01:01")
+        XCTAssertEqual(MissionTimingFormat.duration(0.01, rounding: .up), "0:01")
+        XCTAssertEqual(MissionTimingFormat.duration(59.99, rounding: .down), "0:59")
+        XCTAssertEqual(MissionTimingFormat.duration(0), "0:00")
+        for invalid in [Double.nan, .infinity, -.infinity, -1] {
+            XCTAssertEqual(MissionTimingFormat.duration(invalid), "Timing unavailable")
+        }
+        XCTAssertFalse(MissionTimingFormat.duration(.greatestFiniteMagnitude).isEmpty)
+    }
+
     func testMissionFlightChecklistAllowsIndependentCompletionAndReopening() {
         var progress = MissionFlightProgress(instructionCount: 5)
 

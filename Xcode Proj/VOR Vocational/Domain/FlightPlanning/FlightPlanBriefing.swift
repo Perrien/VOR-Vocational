@@ -3,13 +3,14 @@ import Foundation
 /// Read-only plan information prepared for a player-facing briefing. It keeps
 /// calculated route geometry separate from the instructions a player acts on:
 /// the terminal position reference is an instruction, while the final
-/// intersection-to-airport geometry remains chart-only.
+/// intersection-to-airport geometry belongs to the chart and timing schedule.
 nonisolated struct FlightPlanBriefing: Equatable {
     let planName: String
     let originName: String
     let destinationName: String
     let totalDistanceNM: Double
     let stillAirEstimate: StillAirEstimate
+    let timingSchedule: MissionTimingSchedule
     let steps: [FlightPlanBriefingStep]
 
     init(resolvedPlan: ResolvedFlightPlan) {
@@ -18,6 +19,7 @@ nonisolated struct FlightPlanBriefing: Equatable {
         destinationName = resolvedPlan.points.last?.name ?? "Destination"
         totalDistanceNM = resolvedPlan.totalDistanceNM
         stillAirEstimate = resolvedPlan.stillAirEstimate
+        timingSchedule = MissionTimingSchedule(resolvedPlan: resolvedPlan)
 
         var steps = resolvedPlan.legs.compactMap { leg -> FlightPlanBriefingStep? in
             guard let guidance = leg.guidance else { return nil }

@@ -22,16 +22,19 @@ nonisolated struct MissionFlightDefinition: Equatable {
     let plannedPoints: [MissionChartPoint]
     let arrivalReference: MissionChartPoint?
     let instructions: [MissionInstruction]
+    /// Explicit timing input; arbitrary chart points/instructions imply no schedule.
+    let timingSchedule: MissionTimingSchedule?
 
     init(id: String, title: String, initialState: FlightAircraftState,
          plannedPoints: [MissionChartPoint] = [], arrivalReference: MissionChartPoint? = nil,
-         instructions: [MissionInstruction] = []) {
+         instructions: [MissionInstruction] = [], timingSchedule: MissionTimingSchedule? = nil) {
         self.id = id
         self.title = title
         self.initialState = initialState
         self.plannedPoints = plannedPoints
         self.arrivalReference = arrivalReference
         self.instructions = instructions
+        self.timingSchedule = timingSchedule
     }
 
     init(resolvedPlan: ResolvedFlightPlan) {
@@ -55,7 +58,8 @@ nonisolated struct MissionFlightDefinition: Equatable {
                                    detail: step.kind == .terminalReference
                                    ? "Use this practical radial reference to locate \(briefing.destinationName); it is not a literal airport course."
                                    : nil)
-            }
+            },
+            timingSchedule: briefing.timingSchedule
         )
     }
 }

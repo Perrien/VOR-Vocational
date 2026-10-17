@@ -53,7 +53,7 @@ An ordered route made of an origin, zero or more waypoints, and a destination. I
 A route point defined by where two VOR radials meet. A stored radial is measured outbound FROM its station, even when the player-facing instruction uses a reciprocal TO course.
 
 **Still-air estimate**  
-The planned travel time calculated from route distance and cruise speed before wind is considered.
+Travel time estimated from planned route distance and airspeed, without wind correction. The original schedule uses the assigned planning airspeed; a running estimate can reflect airspeed changes and player-declared progress. Neither confirms actual arrival.
 
 ## Wind
 

@@ -4,6 +4,18 @@ Each entry is one individually addressable idea. Refer to its ID—for example, 
 
 ## Active
 
+### I-011 — Mission leg timing
+
+**Status:** Stage 1 accepted for commit; Stage 2 authorized
+**Type:** Feature
+**Next action:** Commit Stage 1, then implement and verify Stage 2 live timing through its owner checkpoint
+
+**What it is:** Stage 1 now shows a fixed still-air schedule for every geometric leg in the Transport briefing, separately from NAV guidance, and carries it into the shared mission definition. Live current/next estimates, Start/Restart/Undo, the persistent strip, and optional one-time return to 1× remain later stages. All estimates use airspeed and player-declared progress without hidden aircraft position; wind correction is reserved for a later flight-planning skill.
+
+**Exploration:** [Timing options and open questions](Explorations/I-011-mission-leg-timing.md)
+
+**Plan:** [Mission leg timing](Plans/I-011-Mission-Leg-Timing.md)
+
 ### I-003 — Mission quality and debrief
 
 **Status:** Stages 1–2 committed; Stage 3 interactive debrief implemented — final owner review/commit pending
