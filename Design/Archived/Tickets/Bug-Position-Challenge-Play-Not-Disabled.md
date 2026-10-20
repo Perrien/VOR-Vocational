@@ -1,3 +1,5 @@
+> **Historical ticket from the retired workflow.** Archived during document consolidation; this move does not assert a new fix or acceptance. Current work is tracked in [Design/IDEAS.md](../../IDEAS.md).
+
 # Bug-Position-Challenge-Play-Not-Disabled
 
 Status: untriaged

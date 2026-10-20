@@ -4,7 +4,7 @@
 
 **Idea:** I-011 — completed entry removed from IDEAS.md at the owner's request on 2026-10-20.
 
-**Build plan:** [Archived mission leg timing plan](../Plans/Archived/I-011-Mission-Leg-Timing.md). It records all three implemented stages, verification, and owner acceptance.
+**Build plan:** [Archived mission leg timing plan](../Plans/I-011-Mission-Leg-Timing.md). It records all three implemented stages, verification, and owner acceptance.
 
 **Outcome:** All three stages are complete. The owner accepted the feature, authorized closeout and archival, and chose to remove the completed idea from the active index. The exploration below preserves the original requirements and rationale; wind-aware planning and the other deferred features remain later work.
 

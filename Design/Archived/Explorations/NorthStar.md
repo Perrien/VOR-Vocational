@@ -1,3 +1,5 @@
+> **Historical product-direction exploration.** Read [README.md](../../../README.md) for implemented behavior and [Design/IDEAS.md](../../IDEAS.md) for current work. Aspirations in this record are not implementation requirements.
+
 # VOR Navigator project direction
 
 ## The product in one sentence

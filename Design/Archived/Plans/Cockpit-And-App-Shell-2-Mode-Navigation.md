@@ -323,7 +323,7 @@ cockpit-flight-deck T3: bring back Position Challenge under Practice
     green.
   - Archive the exploration `Cockpit-And-App-Shell`, the plan
     `Cockpit-And-App-Shell-1-Free-Flight-Flight-Deck`, and this plan, using the routine in
-    `Design/Execution-Protocol.md` §11 — each as `executed`, one `ArchivedCatalog.md` line apiece.
+    `Design/Archived/Execution-Protocol.md` §11 — each as `executed`, one `ArchivedCatalog.md` line apiece.
 - **Do not:** add Mode content beyond what S1–S5 and U1–U7 describe, add a new ADR unless a real
   trade-off surfaced during Tasks 1–3, or archive anything not named above.
 

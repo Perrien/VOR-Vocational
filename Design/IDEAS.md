@@ -6,15 +6,15 @@ Each entry is one individually addressable idea. Refer to its ID—for example, 
 
 ### I-003 — Mission quality and debrief
 
-**Status:** Stages 1–2 committed; Stage 3 interactive debrief implemented — final owner review/commit pending
+**Status:** Wind, recording, and interactive unscored debrief implemented and committed; scoring unexplored
 **Type:** Initiative
-**Next action:** Review and commit Stage 3; after acceptance, archive the completed build plan and explore scoring using recorded flights
+**Next action:** Confirm the recorded I-003 visual-review items, then explore scoring using recorded flights
 
 **What it is:** Shared mission wind, flight recording, ending, and unscored planned-versus-flown debrief capabilities for authored and generated missions. Silverkeep → Midland is the first test integration. Offer Calm or randomly populated, editable Steady wind; show the debrief on Flight Complete or flying off the map. Mission identity, starting state, route, instructions, and any arrival reference are inputs. Instruction checkmarks remain player assists and never affect scoring.
 
-**Exploration:** [Wind, recording, and first debrief design](Explorations/I-003-mission-quality-and-debrief.md)
+**Exploration:** [Archived wind, recording, and first debrief design](Archived/Explorations/I-003-mission-quality-and-debrief.md)
 
-**Build plan:** [Wind, flight recording, and first debrief](Plans/I-003-Wind-Recording-Debrief.md)
+**Delivered scope:** [Archived wind, flight recording, and first debrief plan](Archived/Plans/I-003-Wind-Recording-Debrief.md)
 
 ## Later
 

@@ -1,12 +1,12 @@
 # I-003 — Mission quality and debrief
 
-**Status:** Stages 1–2 committed; Stage 3 interactive debrief implemented, final owner review pending
+**Status:** Bounded exploration implemented and archived; all three stages committed, recorded I-003 visual review still pending
 
-**Idea:** [I-003 in IDEAS.md](../IDEAS.md#i-003--mission-quality-and-debrief)
+**Idea:** [I-003 in IDEAS.md](../../IDEAS.md#i-003--mission-quality-and-debrief)
 
-**Build plan:** [Wind, flight recording, and first debrief](../Plans/I-003-Wind-Recording-Debrief.md). The plan resolves the engineering details identified below and defines implementation stages and owner checkpoints.
+**Build plan:** [Archived wind, flight recording, and first debrief](../Plans/I-003-Wind-Recording-Debrief.md). It records implementation stages, verification, and owner checkpoints.
 
-**Current focus:** Final owner review of steady wind, flight recording, and the interactive unscored planned-versus-flown debrief. Scoring design follows acceptance; the deferred weighting below remains a proposal.
+**Outcome:** Steady wind, flight recording, and the interactive unscored planned-versus-flown debrief are implemented. Stage 3 was committed as `0541bd7`; the older commit-pending wording below belongs to its execution history. The recorded I-003 visual-review items remain separate. Final scoring needs a later exploration; the deferred weighting below remains a proposal.
 
 ## Purpose and scope
 
@@ -84,7 +84,7 @@ The bounded direction is:
 - Display and enter the direction in whole degrees **000–359°**, inclusive.
 - The bearing identifies the direction the wind comes from. **270°** means wind coming from the west and blowing toward the east.
 - Random direction distribution, handling of an entered 360°, and the north reference remain open.
-- The shared definition is recorded in [Glossary.md](../Glossary.md#wind).
+- The shared definition is recorded in [Glossary.md](../../Glossary.md#wind).
 
 ### Wind-entry validation
 
@@ -243,7 +243,7 @@ These are user-visible outcomes and their dependencies, not implementation tasks
 
 ## Planning handoff
 
-The [active build plan](../Plans/I-003-Wind-Recording-Debrief.md) turns these settled requirements into three implementation stages: navigating with steady wind, inspecting a recorded flight in a first working debrief, and completing pan/zoom and visual verification. Stages 1 and 2 are committed as `76f44b7` and `c6f62f7`. Stage 3 is implemented and awaiting final owner review/commit. After acceptance, archive the plan and explore scoring against recorded flights; no weighting or grade has been implemented.
+The [archived build plan](../Plans/I-003-Wind-Recording-Debrief.md) records three implementation stages: navigating with steady wind, inspecting a recorded flight in a first working debrief, and completing pan/zoom and visual verification. They are committed as `76f44b7`, `c6f62f7`, and `0541bd7`. The bounded implementation records are archived; the recorded visual-review items remain unaccepted. Later scoring exploration can use the resulting flights; no weighting or grade has been implemented.
 
 Scoring remains a separate later exploration within I-003, informed by the resulting flight evidence. The 35% / 65% proposal is preserved for that discussion and must not become a score in the first slice. Checkmarks remain excluded from assessment throughout.
 

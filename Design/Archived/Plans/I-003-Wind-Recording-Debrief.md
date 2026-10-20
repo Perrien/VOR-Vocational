@@ -1,12 +1,12 @@
 # I-003 — Wind, flight recording, and first debrief
 
-**Status:** Stages 1–2 committed; Stage 3 implemented — final owner review pending
+**Status:** All three implementation stages committed; archived record with recorded I-003 visual review still pending
 
-**Idea:** [I-003 in IDEAS.md](../IDEAS.md#i-003--mission-quality-and-debrief)
+**Idea:** [I-003 in IDEAS.md](../../IDEAS.md#i-003--mission-quality-and-debrief)
 
 **Requirements:** [Settled exploration](../Explorations/I-003-mission-quality-and-debrief.md)
 
-**Current checkpoint:** Stage 3 — Interactive debrief inspection; final owner review and commit decision pending
+**Current checkpoint:** Implementation is committed through Stage 3 (`0541bd7`). Recorded visual-review limits remain below; archive placement does not imply owner acceptance of them. Scoring remains separate future work. Older commit-pending wording in the execution log is historical.
 
 ## Outcome and boundaries
 

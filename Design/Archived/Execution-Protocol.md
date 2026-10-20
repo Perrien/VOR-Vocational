@@ -1,3 +1,5 @@
+> **Retired workflow reference.** This protocol is preserved as history. Follow [AGENTS.md](../../AGENTS.md) and the current document map; its ticket backlog and execution rules are not active requirements.
+
 # Execution Protocol — how the coding agent works a plan
 
 `Version: 1.2 (2026-09-17)` · `Audience: the executing AI coding agent`
@@ -43,7 +45,7 @@ These are the project folders and source locations.
 
 | | |
 |---|---|
-| This protocol | `Design/Execution-Protocol.md` |
+| This protocol | `Design/Archived/Execution-Protocol.md` |
 | Active explorations | `Design/Explorations/` |
 | Active plans | `Design/Plans/` |
 | Backlog — the sole authority on what to build next | `Design/Tickets/` |

@@ -4,7 +4,7 @@
 **Goal:** Let the player judge when to accelerate playback by reading a fixed still-air schedule, a current-leg running estimate, and a next-leg duration preview.
 
 **Idea:** I-011 — completed entry removed from IDEAS.md at the owner's request on 2026-10-20.
-**Requirements:** [Settled exploration](../../Explorations/I-011-mission-leg-timing.md)
+**Requirements:** [Settled exploration](../Explorations/I-011-mission-leg-timing.md)
 **Closeout:** The owner accepted the feature and requested “All looking good. let's close it out and archive.” on 2026-10-20, then explicitly chose “Remove the completed entry” for IDEAS.md. All implementation stages and this plan are closed. Historical visual limits remain recorded below; no new exact-window measurement is claimed. I-003 acceptance and its pre-existing archive moves remain separate.
 
 ## Context, baseline, and boundaries

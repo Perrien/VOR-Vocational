@@ -1,56 +1,91 @@
 # VOR glossary
 
-VOR is a Mac-first game for learning and practising aviation VOR navigation in a fictional region.
-
 ## Learning and play
 
 **Mode**
 
-One of the four player-facing ways to engage with VOR navigation: Learn, Practice, Free Flight, or Missions.
-_Avoid_: Game mode, category
+One player-facing way to use VOR: Learn, Practice, Free Flight, or Missions.
 
 **Free Flight**
 
-An open-world, unscored mode in which the player chooses how to use the Myosia chart and navigation instruments.
-_Avoid_: Sandbox, open world
+An open, unscored session on the Myosia chart. The player chooses what to explore and practise.
 
 **Skill Exercise**
 
-A focused navigation activity that teaches or rehearses one skill, such as finding a position fix or intercepting and tracking a radial.
-_Avoid_: Challenge
+A focused activity that teaches or rehearses one navigation skill, such as finding a position fix or intercepting and tracking a radial.
 
 **Mission**
 
-A scored flight with a concrete operational objective that combines two or more navigation skills.
-_Avoid_: Challenge, scenario
+A flight with a concrete operational objective that combines navigation skills. Scoring and debrief can assess how it was flown.
+
+**Debrief**
+
+A review after a flight ends, comparing the planned route with the flown path and showing the flight conditions and ending measurements.
+
+**Position Challenge**
+
+A Practice exercise in which the app hides the real position, the player uses VOR indications to infer it, then places a guess on the chart and sees the error in nautical miles.
 
 ## Flight instruments
 
 **Heading Indicator**
 
-The complete compass display that shows the aircraft reference and directional markings for its current heading.
-_Avoid_: Heading dial, heading knob
+The compass display showing the aircraft's current heading and directional markings.
 
 **Heading Knob**
 
-The rotary control the player turns to set the aircraft's heading. Turning it left decreases the heading and turning it right increases it.
-_Avoid_: Course knob, heading buttons
+The rotary control used to set the aircraft heading. Turning left decreases the heading; turning right increases it.
 
 **VOR Indicator**
 
-The complete circular instrument display for one NAV receiver. It contains the Course Deviation Indicator and shows the receiver's selected course and TO/FROM indication.
-_Avoid_: NAV dial, compass dial
+The circular display for one NAV receiver. It includes a CDI and shows the selected course and TO/FROM indication.
 
 **Course Deviation Indicator (CDI)**
 
-The movable line in a VOR Indicator that deflects from centre to show the aircraft's lateral displacement from the receiver's selected course.
-_Avoid_: Needle, radial line
+The movable line in a VOR Indicator. Its deflection from centre shows the aircraft's lateral displacement from the selected course.
 
 **OBS Dial**
 
-The rotary control used to select the course on one NAV receiver.
-_Avoid_: Course knob
+The rotary control used to select the course for a NAV receiver.
+
+**TO/FROM flag**
+
+The indication of whether the selected OBS course leads toward or away from the tuned station.
 
 **Radio Panel**
 
-The portion of a NAV receiver's bay that displays and controls its tuned frequency, received station identifier, and related radio information.
+The part of a NAV receiver that shows and controls its tuned frequency and the received station identification.
+
+## Route planning
+
+**Flight plan**
+
+An ordered route made of an origin, zero or more waypoints, and a destination. It supplies route geometry and lets the app derive player-facing NAV instructions.
+
+**Radial intersection**
+
+A route point defined by where two VOR radials meet. A stored radial is measured outbound FROM its station, even when the player-facing instruction uses a reciprocal TO course.
+
+**Still-air estimate**
+
+Travel time estimated from planned route distance and airspeed, without wind correction. The original schedule uses the assigned planning airspeed; a running estimate can reflect airspeed changes and player-declared progress. Neither confirms actual arrival.
+
+## Wind
+
+**Calm**
+
+Zero wind, producing no wind drift.
+
+**Steady wind**
+
+Wind whose direction and speed remain constant throughout a flight.
+
+**Wind from**
+
+The bearing of the direction the wind comes from. Wind from 270° comes from the west and blows toward the east. Use this label wherever wind direction is shown, including the briefing, live mission reference, and debrief.
+
+## World
+
+**Myosia**
+
+VOR's fixed fictional training region and chart. It is 500 nautical miles wide; its height follows the artwork's aspect ratio.
