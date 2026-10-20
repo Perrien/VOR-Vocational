@@ -4,6 +4,7 @@ import SwiftUI
 struct MissionFlightView: View {
     let mission: MissionFlightDefinition
     let conditions: FlightConditions
+    @Binding private var returnsToNormalPlayback: Bool
     var onBriefing: () -> Void
     var onMissions: () -> Void
     var onHome: () -> Void
@@ -14,14 +15,18 @@ struct MissionFlightView: View {
     @Environment(FlightDiagnosticsStore.self) private var diagnosticsStore
 
     init(mission: MissionFlightDefinition, conditions: FlightConditions,
+         returnsToNormalPlayback: Binding<Bool>,
          onBriefing: @escaping () -> Void, onMissions: @escaping () -> Void,
          onHome: @escaping () -> Void) {
         self.mission = mission
         self.conditions = conditions
+        _returnsToNormalPlayback = returnsToNormalPlayback
         self.onBriefing = onBriefing
         self.onMissions = onMissions
         self.onHome = onHome
-        _session = State(initialValue: FlightSession(mission: mission, conditions: conditions))
+        let initialSession = FlightSession(mission: mission, conditions: conditions)
+        initialSession.returnsToNormalPlayback = returnsToNormalPlayback.wrappedValue
+        _session = State(initialValue: initialSession)
         _progress = State(initialValue: MissionFlightProgress(instructionCount: mission.instructions.count))
     }
 
@@ -54,6 +59,9 @@ struct MissionFlightView: View {
         }
         .ignoresSafeArea()
         .onAppear { diagnosticsStore.activeSession = session }
+        .onChange(of: returnsToNormalPlayback) { _, enabled in
+            session.returnsToNormalPlayback = enabled
+        }
         .onDisappear {
             session.leaveMission()
             if diagnosticsStore.activeSession === session { diagnosticsStore.activeSession = nil }
@@ -66,7 +74,7 @@ struct MissionFlightView: View {
                 .foregroundStyle(ControlPalette.primaryText)
             if session.legTiming != nil {
                 Divider()
-                MissionTimingPanel(session: session)
+                MissionTimingPanel(session: session, returnsToNormalPlayback: $returnsToNormalPlayback)
             }
             if !mission.instructions.isEmpty {
                 Divider()
@@ -135,27 +143,29 @@ struct MissionRunnerPreviewView: View {
     @State private var diagnosticsStore = FlightDiagnosticsStore()
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var preset: Preset = .timed
+    @State private var returnsToNormalPlayback = false
 
     private enum Preset: String, CaseIterable {
         case timed = "Timed 20-NM route with a 4-NM next leg at 120 kt"
         case manual = "Manual start away from origin"
+        case shortLeg = "Short leg"
         case noTiming = "No timing"
         case invalid = "Invalid timing"
 
         var mission: MissionFlightDefinition {
             let points = [
                 MissionChartPoint(name: "Training departure airport", normalizedPosition: CGPoint(x: 0.4, y: 0.5)),
-                MissionChartPoint(name: "Repeated radial intersection reference", normalizedPosition: CGPoint(x: 0.44, y: 0.5)),
-                MissionChartPoint(name: "Repeated radial intersection reference", normalizedPosition: CGPoint(x: 0.448, y: 0.5))
+                MissionChartPoint(name: "Repeated radial intersection reference", normalizedPosition: CGPoint(x: self == .shortLeg ? 0.402 : 0.44, y: 0.5)),
+                MissionChartPoint(name: "Repeated radial intersection reference", normalizedPosition: CGPoint(x: self == .shortLeg ? 0.41 : 0.448, y: 0.5))
             ]
             let schedule: MissionTimingSchedule?
             switch self {
             case .noTiming: schedule = nil
             case .invalid:
                 schedule = MissionTimingSchedule(legs: [], planningAirspeedKnots: 120)
-            case .timed, .manual:
+            case .timed, .manual, .shortLeg:
                 schedule = MissionTimingSchedule(legs: [
-                    .init(startLabel: points[0].name, endLabel: points[1].name, distanceNM: 20),
+                    .init(startLabel: points[0].name, endLabel: points[1].name, distanceNM: self == .shortLeg ? 1 : 20),
                     .init(startLabel: points[1].name, endLabel: points[2].name, distanceNM: 4)
                 ], planningAirspeedKnots: 120,
                    startupPolicy: self == .manual ? .manual : .firstLegOnFirstPlay)
@@ -179,6 +189,7 @@ struct MissionRunnerPreviewView: View {
             .pickerStyle(.menu).padding(8).frame(maxWidth: 680)
             MissionFlightView(mission: preset.mission,
                 conditions: .steady(SteadyWind(fromDegrees: 180, speedKnots: 15)!),
+                returnsToNormalPlayback: $returnsToNormalPlayback,
                 onBriefing: closePreview, onMissions: closePreview, onHome: closePreview)
                 .id(preset)
                 .clipped()

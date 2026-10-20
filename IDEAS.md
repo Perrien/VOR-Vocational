@@ -4,18 +4,6 @@ Each entry is one individually addressable idea. Refer to its ID—for example, 
 
 ## Active
 
-### I-011 — Mission leg timing
-
-**Status:** Stage 2 accepted for commit; Stage 3 authorized
-**Type:** Feature
-**Next action:** Commit Stage 2, then implement and verify the optional one-time playback return through the final checkpoint
-
-**What it is:** The briefing and live mission now use one instruction list with each step's NAV guidance and timing together. Stage 2 adds current/next estimates inside the relevant cards, Start/Restart/Undo, exact expiry with a count-up, and a persistent strip above the cockpit. Stage 3 still adds the optional one-time return to 1×. All estimates use airspeed and player-declared progress without hidden aircraft position; wind correction is reserved for a later flight-planning skill.
-
-**Exploration:** [Timing options and open questions](Explorations/I-011-mission-leg-timing.md)
-
-**Plan:** [Mission leg timing](Plans/I-011-Mission-Leg-Timing.md)
-
 ### I-003 — Mission quality and debrief
 
 **Status:** Stages 1–2 committed; Stage 3 interactive debrief implemented — final owner review/commit pending

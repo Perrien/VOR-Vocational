@@ -1,12 +1,12 @@
 # I-011 — Mission leg timing
 
-**Status:** Exploration complete; feature planned
+**Status:** Feature implemented and accepted on 2026-10-20; build plan archived
 
-**Idea:** [I-011 in IDEAS.md](../IDEAS.md#i-011--mission-leg-timing)
+**Idea:** I-011 — completed entry removed from IDEAS.md at the owner's request on 2026-10-20.
 
-**Build plan:** [Mission leg timing](../Plans/I-011-Mission-Leg-Timing.md). It resolves the engineering handoff below and defines three visible stages and owner checkpoints.
+**Build plan:** [Archived mission leg timing plan](../Plans/Archived/I-011-Mission-Leg-Timing.md). It records all three implemented stages, verification, and owner acceptance.
 
-**Next action:** Build Stage 1 of that plan after the owner chooses to begin. Implementation has not begun. No implementation or executable build plan was produced during the exploration itself.
+**Outcome:** All three stages are complete. The owner accepted the feature, authorized closeout and archival, and chose to remove the completed idea from the active index. The exploration below preserves the original requirements and rationale; wind-aware planning and the other deferred features remain later work.
 
 ## Purpose and intended experience
 
@@ -16,7 +16,7 @@ The owner wants a duration for each mission leg and an indication of when in the
 
 An illustrative need is knowing that the next action is approximately **7 simulated minutes** away, so the player can temporarily accelerate playback. Seven minutes is an example, not a fixed threshold or notification requirement. An optional return to **1×** with **1 estimated simulated minute remaining** is now settled, off by default.
 
-## Current behavior and foundations
+## Baseline behavior and foundations
 
 Grounded in the source and current project documents on **2026-10-16**:
 

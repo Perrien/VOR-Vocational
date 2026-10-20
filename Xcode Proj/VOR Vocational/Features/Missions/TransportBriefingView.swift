@@ -8,6 +8,7 @@ struct TransportBriefingView: View {
 
     @State private var launchedConditions: FlightConditions?
     @State private var windSetup = MissionWindSetup()
+    @State private var returnsToNormalPlayback = false
     private let content: TransportBriefingContent?
     private let loadError: String?
 
@@ -29,6 +30,7 @@ struct TransportBriefingView: View {
             MissionFlightView(
                 mission: MissionFlightDefinition(resolvedPlan: content.resolvedPlan),
                 conditions: launchedConditions,
+                returnsToNormalPlayback: $returnsToNormalPlayback,
                 onBriefing: { self.launchedConditions = nil },
                 onMissions: onMissions,
                 onHome: onHome
@@ -61,6 +63,7 @@ struct TransportBriefingView: View {
                 FlightPlanPanel(briefing: content.briefing,
                                 onMissions: onMissions,
                                 windSetup: $windSetup,
+                                returnsToNormalPlayback: $returnsToNormalPlayback,
                                 onStart: { launchedConditions = $0 })
                     .frame(width: min(max(340, geometry.size.width * 0.34), 430))
             }
@@ -130,6 +133,7 @@ private struct FlightPlanPanel: View {
     let briefing: FlightPlanBriefing
     let onMissions: () -> Void
     @Binding var windSetup: MissionWindSetup
+    @Binding var returnsToNormalPlayback: Bool
     let onStart: (FlightConditions) -> Void
 
     var body: some View {
@@ -154,6 +158,9 @@ private struct FlightPlanPanel: View {
                     summary
                     Divider()
                     MissionWindSetupView(setup: $windSetup)
+                    Divider()
+                    MissionPlaybackReturnToggle(isEnabled: $returnsToNormalPlayback)
+                        .disabled(briefing.timingSchedule.legs == nil)
                     Divider()
                     Text("Mission steps")
                         .font(.headline)

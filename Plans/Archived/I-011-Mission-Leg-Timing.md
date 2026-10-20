@@ -1,17 +1,17 @@
 # I-011 — Mission leg timing
 
-**Status:** Stage 2 accepted for commit; Stage 3 authorized
+**Status:** Complete — accepted and archived on 2026-10-20
 **Goal:** Let the player judge when to accelerate playback by reading a fixed still-air schedule, a current-leg running estimate, and a next-leg duration preview.
 
-**Idea:** [I-011 in IDEAS.md](../IDEAS.md#i-011--mission-leg-timing)
-**Requirements:** [Settled exploration](../Explorations/I-011-mission-leg-timing.md)
-**Current checkpoint:** Owner requested “Commit and proceed” after the combined-panel review. Commit Stage 2, then implement Stage 3 through its final checkpoint. No additional minimum-window visual review is inferred.
+**Idea:** I-011 — completed entry removed from IDEAS.md at the owner's request on 2026-10-20.
+**Requirements:** [Settled exploration](../../Explorations/I-011-mission-leg-timing.md)
+**Closeout:** The owner accepted the feature and requested “All looking good. let's close it out and archive.” on 2026-10-20, then explicitly chose “Remove the completed entry” for IDEAS.md. All implementation stages and this plan are closed. Historical visual limits remain recorded below; no new exact-window measurement is claimed. I-003 acceptance and its pre-existing archive moves remain separate.
 
 ## Context, baseline, and boundaries
 
 Reviewed on 2026-10-16 against **0541bd7**, `Finish interactive mission debrief inspection`. The working tree already contains the I-011 exploration and related README, IDEAS, and glossary edits; preserve them. Planning alone did not authorize implementation or a commit. The owner's “Let's begin implementing the I-011 plan” authorizes Stage 1; stage checkpoints and commit choices still apply.
 
-The current app is one macOS SwiftUI target. Transport has a resolved six-point, five-leg route, five independent checklist instructions, editable wind before launch, shared model-owned movement and recording, and an unscored debrief. The briefing shows distances and one total estimate at 260 kt. The live mission shows no leg timing. `FlightSession.advance(wallElapsed:)` owns simulated time, physics, samples, and chart-exit completion; the view only delivers monotonic time. Source folders are synchronized, pure domain declarations need explicit `nonisolated`, and app/view state stays on the main actor.
+At the reviewed baseline, the app was one macOS SwiftUI target. Transport had a resolved six-point, five-leg route, five independent checklist instructions, editable wind before launch, shared model-owned movement and recording, and an unscored debrief. The briefing shows distances and one total estimate at 260 kt. The live mission shows no leg timing. `FlightSession.advance(wallElapsed:)` owns simulated time, physics, samples, and chart-exit completion; the view only delivers monotonic time. Source folders are synchronized, pure domain declarations need explicit `nonisolated`, and app/view state stays on the main actor.
 
 Two project records need care:
 
@@ -156,7 +156,7 @@ All paths below are relative to the repository root. No project-membership edits
 
 ## Stage 2 — Use current and next timing in flight
 
-**State:** Implemented; automated and bounded visual verification passed. Owner review/commit pending, with the main-window visual limit recorded below.
+**State:** Committed as `0f544be` on 2026-10-16 after the owner authorized commit and Stage 3. Earlier visual limits remain recorded below.
 
 - [x] Add the pure timing model and bounded selected/Undo context advancement, exact expiry, zero-speed/unselected/unavailable states, and next-leg preview.
 - [x] Integrate timing startup, controls, accepted-time updates, and retry/completion into `FlightSession`. Preserve the existing movement/clock path; do not add automatic playback return yet.
@@ -180,13 +180,13 @@ All paths below are relative to the repository root. No project-membership edits
 
 ## Stage 3 — Optionally return playback to 1×
 
-**State:** Authorized; begins after the Stage 2 commit.
+**State:** Complete and accepted by the owner on 2026-10-20. Full automated and bounded visual verification passed; the historical exact minimum main-window limit remains explicit below.
 
-- [ ] Add the retained per-briefing enable choice and its shared-runner bridge; default off. Expose the toggle in the live timing controls with the exact one-minute condition.
-- [ ] Add pure threshold/eligibility and per-context consumed state. Preserve one-shot behavior through Undo, pause, speed edits, toggles, and manual overrides; apply the short-leg/in-threshold/expired rules above.
-- [ ] Refactor session advancement only as specified to consume a delivered wall interval on both sides of the threshold, honor earlier/coincident endings, and advance timing/Undo from accepted simulated time.
-- [ ] Add a **Short leg** development preset to the existing preview, keeping selectable absent/manual/invalid cases. Verify after-the-fact enabling and preference retention without persistent storage.
-- [ ] Run the event/regression checks below and full suite, Debug/Release builds, and visual checks; update all delivered-state records and this checkpoint. No optional assist appears in Free Flight/Practice or the debrief.
+- [x] Add the retained per-briefing enable choice and its shared-runner bridge; default off. Expose the toggle in the live timing controls with the exact one-minute condition.
+- [x] Add pure threshold/eligibility and per-context consumed state. Preserve one-shot behavior through Undo, pause, speed edits, toggles, and manual overrides; apply the short-leg/in-threshold/expired rules above.
+- [x] Refactor session advancement only as specified to consume a delivered wall interval on both sides of the threshold, honor earlier/coincident endings, and advance timing/Undo from accepted simulated time.
+- [x] Add a **Short leg** development preset to the existing preview, keeping selectable absent/manual/invalid cases. Verify after-the-fact enabling and preference retention without persistent storage.
+- [x] Run the event/regression checks below and full suite, Debug/Release builds, and bounded visual checks (remaining main-window limit below); update all delivered-state records and this checkpoint. No optional assist appears in Free Flight/Practice or the debrief.
 
 **Verification:** Prove the 20-wall-second reference produces 542 simulated seconds, 58 s remaining, multiplier 1, and exactly timestamps 0…542. Compare a single large advance against independently partitioned wall advances with the same assist event; include fractional thresholds, a turning trajectory, and recording samples on both sides of the split. Preserve existing endpoint error ≤1e-7 NM for independent analytic geometry, playback partition position error ≤1e-6 NM, heading error ≤1e-7°, and crossing/elapsed error ≤1e-6 s. Do not widen old assertions. Also cover:
 
@@ -201,9 +201,9 @@ All paths below are relative to the repository root. No project-membership edits
 
 **Final commit point:** Show verification, trial path, and any visual review limits, then stop for owner acceptance/commit. Suggested commit: **`Add optional return to normal mission playback`**. Do not accept I-003's separate review or archive this plan before final acceptance.
 
-- [ ] Owner reviewed Stage 3, including the normal minimum window, and chose whether/how to commit.
-- [ ] Owner accepted the feature. Ask whether I-011 should remain in the index now that more than half (here all) of its scope is delivered; never remove it without the answer.
-- [ ] Update I-011's exact entry with the honest delivered/next state or remove it only if authorized; remove its completed Plan field. Keep deferred wind planning separate. Update README to actual behavior, then move this completed plan to `Plans/Archived/` and repair retained links.
+- [x] Owner accepted Stage 3 and authorized commit/closeout after being told the exact minimum main-window verification limit. No specific window measurement was supplied.
+- [x] Owner accepted the feature and explicitly chose to remove the completed I-011 entry from the index.
+- [x] Removed the completed I-011 entry as authorized, retained deferred wind planning in the feature records, updated README and exploration to delivered behavior, archived this plan, and repaired retained links.
 
 ## Verification commands and stopping rules
 
@@ -278,3 +278,30 @@ The planning-only change ran no app tests/builds. Stage 1 results follow; later 
 - Final `git diff --check`, the new timing model's whitespace/newline check, and all **12 local document links** passed. The prior exact-minimum-main-Transport window limit remains; the shared compact preview is verified. After closing that preview, app-control tools timed out while trying to refocus the main window, so no final visible Transport state is claimed. The verified Debug build remains at `/tmp/VOR-I011-DerivedData/Build/Products/Debug/VOR Vocational.app`; run it and choose Missions → Transport to review both lists. Return to the Stage 2 owner review checkpoint with Stage 3 on hold and all Stage 2/revision changes uncommitted.
 
 - Owner subsequently requested **“Commit and proceed”**: commit Stage 2 with the combined instruction/timing cards, then implement Stage 3. Existing visual limits remain recorded; this does not accept I-003 or authorize committing its separate archive moves.
+
+
+### Stage 3 execution — 2026-10-16
+
+- Committed Stage 2 and the owner's combined-panel revision as **`0f544be` — `Add live mission timing to unified instruction cards`** before Stage 3 source edits. The three pre-existing archive moves and their two README/IDEAS link repairs remain outside that commit and untouched by this stage. The owner authorized Stage 3 implementation through this checkpoint, not its final commit, feature acceptance, or I-003 acceptance.
+- Added **Return to 1× with 1 minute remaining** to the briefing and compact live timing header, initially off. Transport and the Debug launcher each own a transient choice and supply a binding to the generic runner. Live edits update that choice; the session owns the effective flag. Retry carries the flag while recreating timing/recording state. No persistent storage or Transport-specific behavior enters the runner/session.
+- Added pure selected-context threshold calculation and consumption stored alongside the existing selected/Undo context. Both contexts continue receiving accepted time, but only the selected context may request a return. Explicit Start/Restart creates a fresh allowance; Undo retains prior consumption, including when its saved estimate expired while inactive. Pause, speed edits, toggles, and manual acceleration do not re-arm a used return.
+- Split session advancement into the original single-trajectory operation and the wall-interval delivery operation. Eligible accelerated updates stop at the threshold, consume the return, and spend remaining wall time at 1×. Immediate short-leg/in-threshold events consume no accelerated time; the existing crossing solver still checks an outward crossing at that instant before playback changes. Earlier/coincident completion or simulation failure prevents the return. Off/absent/unselected/invalid/consumed timing retains the ordinary conversion path. Physics, first-exit solver, recorder, timer delivery, calibration, cockpit sizing, and existing data/fixtures/tolerances are unchanged.
+- Added the **Short leg** Debug preset, with one 1-NM / 30-second leg at 120 kt and a 4-NM next leg, using in-memory data and explicit instruction associations. Switching presets resets the flight while retaining the preview launcher's choice.
+- Final full test command: `xcodebuild test -project 'Xcode Proj/VOR Vocational.xcodeproj' -scheme 'VOR Vocational' -destination 'platform=macOS' -derivedDataPath /tmp/VOR-I011-DerivedData`, with existing signing settings and approved local access: **90 tests, 0 failures**, `TEST SUCCEEDED`. Log: `/tmp/VOR-I011-stage3-test.log`. Thirteen event/regression tests were added to the 77-test baseline. The first test run exposed exact equality in a new floating-point assertion (58.000000000000014 versus 58); it now uses the plan's existing **1e-6-second** accuracy. No existing assertion or tolerance was changed.
+- Final Debug and Release builds used the commands in **Verification commands** with the same access/settings: **BUILD SUCCEEDED** for both. Logs: `/tmp/VOR-I011-stage3-debug.log` and `/tmp/VOR-I011-stage3-release.log`. Existing warnings remain the weak-variable suggestion, AppIntents metadata notice, and Position Challenge's backward trailing-closure matching notice when that file is rebuilt; no new source warning or unrelated test failure occurred.
+- Independent numerical evidence: a **20-second wall advance at 30×** with assistance gives **542 simulated seconds**, **58 seconds remaining** within **1e-6 s**, multiplier **1×**, and exactly **543 samples at 0…542**. Assistance off gives **600 seconds** and **601 samples**. A **12.345-second** fractional threshold during a turn with steady wind gives **15.1835 simulated seconds** from **3.25 wall seconds**, matching independently partitioned delivery and direct circular-arc/wind geometry. Position agrees within **1e-7 NM**, partition differences within **1e-6 NM**, and headings within **1e-7°**; recording samples on both sides of the split remain on whole seconds.
+- Completion tests cover straight and curved exit/re-entry before/at the return, exact **15-second / 10-second** endings, an immediate outward zero-time exit, and an invalid starting position. Completion/error leaves 30× and the allowance unconsumed. A separate exit at **541.25 seconds**, after the return, truncates the remaining wall interval and keeps exactly samples **0…541 plus the exact finish**. Other tests cover short legs, speed jumps, enabling while paused or inside the threshold, zero speed with wind drift, enabling after expiry, passing the threshold at 1× before accelerating, one-shot manual overrides, consumed/unconsumed/expired Undo, missing/invalid/manual inputs, retry/leaving/completion, and wind/heading/position independence. Existing hour-long motion, timing, recording, boundary, NAV, and debrief tests remain green.
+- Relaunched the signed Debug app and visually checked Transport in full screen. The briefing option initially showed off; enabling it carried into flight. A live edit back to off appeared in the returned briefing. Enabling again, completing with all instructions unchecked, and using Fly Again retained the option while resetting to Not started/zero time. Back to Briefing retained it, while leaving to Missions and opening a new briefing reset it to off. The live chart continued hiding true position and the planned route; the final Elmstead reference retained its wording and separately identified geometric timing. The debrief contained its existing review/return controls and no assist toggle.
+- In the **1100×760-content** Mission Runner Preview (2200×1584-pixel capture including title bar), verified readable timing option, instruction cards, cockpit and 56-point strip, scrolling to card actions and completion, and both panel states. The timed preset visibly changed **30× → 1×** with **0:45** remaining while the panel was hidden. Manual acceleration remained **30×** inside the threshold and beyond expiry. The Short leg preset retained the choice; with it off, 30× continued past expiry. Enabling after expiry did not return playback. Restarting that leg while paused and pressing Play returned immediately to 1× with a fresh 0:30 estimate.
+- **Remaining visual limit:** automation did not establish the exact **1100×760 main Transport window**; full-screen main-window and compact shared-runner checks are the evidence above. The preview includes its selector above the shared flight surface and therefore has less vertical flight space. Main-window minimum-size owner review and I-003's separate outstanding review remain unaccepted. No app minimum size, instrument size, or strip-height adjustment was used to compensate.
+- Final `git diff --check` and all **12 local document links** passed. Relaunched the final Debug build after verification; accessibility confirms the Short leg preset is paused before first Play with assistance enabled and 30× selected, ready for a quick trial. Its final capture was a Stage Manager thumbnail, so the earlier full-resolution compact-window evidence remains the visual result. At the final Stage 3 checkpoint, the feature changes remain uncommitted for the owner's review and commit choice. Do not archive this plan or remove I-011 from the index before final acceptance and the owner's index-retention decision.
+
+
+### Owner acceptance and closeout — 2026-10-20
+
+- After flying the feature, the owner asked why the estimate counted upward on leg 3. Source review confirmed that turning onto the leg does not select it for timing. The owner confirmed they had not pressed **Start this leg** and accepted the clarification; no playback defect was identified. README now states this manual selection behavior explicitly.
+- The owner accepted the completed implementation and requested **“All looking good. let's close it out and archive.”** This authorizes the final Stage 3 commit and plan archival. The owner then explicitly chose **“Remove the completed entry”** for IDEAS.md.
+- Removed only the completed I-011 index entry. Updated README and the retained exploration to completed/accepted status, moved this plan to `Plans/Archived/`, and repaired incoming and relative links. No remaining I-011 implementation or acceptance step is pending. Wind-aware planning, editable planning airspeed, historical starts, route-wide live forecasts, and scoring remain deferred.
+- Preserved the earlier verification record: **90 tests, 0 failures**, plus successful Debug and Release builds with existing settings. Closeout changes only documentation and file placement; source/tests are the previously verified Stage 3 implementation. No new automated exact-minimum main-window check is claimed, and this acceptance does not resolve I-003's separate review.
+- Closeout validation: `git diff --check` passed, all **8 retained local document links** resolve, no incoming Markdown link uses the old plan location, and IDEAS.md contains no I-011 entry. No source or test was changed during closeout.
+- The final feature commit includes Stage 3 and I-011 closeout. The three pre-existing archive moves and their two README/IDEAS link repairs remain outside this commit, preserving the owner's unrelated working-tree changes.

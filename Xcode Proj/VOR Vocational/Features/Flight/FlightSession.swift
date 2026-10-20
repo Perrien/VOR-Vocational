@@ -71,6 +71,8 @@ final class FlightSession {
         }
     }
     var timeMultiplier: Double = 1
+    /// Transient launcher choice; each timing context consumes its own return.
+    var returnsToNormalPlayback = false
     /// Elapsed simulation time, including the selected playback multiplier.
     /// A mission completion records this value; it is not a score or ETA.
     private(set) var elapsedSimulatedSeconds: TimeInterval = 0
@@ -154,22 +156,47 @@ final class FlightSession {
               speedKnots.isFinite, speedKnots >= 0 else { return }
         let elapsed = wallElapsed * timeMultiplier
         guard elapsed.isFinite else { return }
+        if returnsToNormalPlayback, timeMultiplier > 1,
+           let untilReturn = legTiming?.secondsUntilPlaybackReturn(at: elapsedSimulatedSeconds,
+                                                                  airspeedKnots: speedKnots) {
+            let wallUntilReturn = untilReturn / timeMultiplier
+            if wallUntilReturn <= wallElapsed {
+                // A zero-time threshold still gives an outward chart crossing
+                // at this instant priority over the playback action.
+                advance(simulatedElapsed: untilReturn, immediateExitLookahead: untilReturn == 0 ? elapsed : nil)
+                guard isFlying else { return }
+                legTiming?.consumePlaybackReturn()
+                timeMultiplier = 1
+                let remainingWall = wallElapsed - wallUntilReturn
+                if remainingWall > 0 { advance(simulatedElapsed: remainingWall) }
+                return
+            }
+        }
+        advance(simulatedElapsed: elapsed)
+    }
+
+    /// One accepted trajectory segment. Ordinary playback retains the original
+    /// clock compensation, first-exit solver, and integer recording schedule.
+    private func advance(simulatedElapsed elapsed: TimeInterval, immediateExitLookahead: TimeInterval? = nil) {
         let trajectory = FlightPhysics.Trajectory(start: aircraftState,
                                                  selectedHeading: selectedHeading,
                                                  conditions: conditions)
         let startTime = elapsedSimulatedSeconds
-        let adjusted = elapsed - clockCompensation
+        let adjusted = immediateExitLookahead == nil ? elapsed - clockCompensation : 0
         let proposedEnd = startTime + adjusted
         guard proposedEnd.isFinite else { return }
         let duration = proposedEnd - startTime
         let exit: FlightPhysics.Trajectory.ChartExit?
         do {
-            exit = try mission == nil ? nil : trajectory.firstChartExit(through: duration, startingAt: startTime)
+            let candidate = try mission == nil ? nil : trajectory.firstChartExit(
+                through: immediateExitLookahead ?? duration, startingAt: startTime)
+            exit = immediateExitLookahead == nil ? candidate : candidate.flatMap { $0.elapsed == 0 ? $0 : nil }
         } catch {
             isFlying = false
             simulationError = error.localizedDescription
             return
         }
+        if immediateExitLookahead != nil, exit == nil { return }
         let endTime = exit.map { startTime + $0.elapsed } ?? proposedEnd
         let next = exit?.state ?? trajectory.state(at: duration)
         recording?.record(trajectory, startingAt: startTime, through: endTime)
@@ -200,7 +227,9 @@ final class FlightSession {
 
     func freshMissionSession() -> FlightSession {
         guard let mission else { preconditionFailure("Retry requires a mission definition.") }
-        return FlightSession(mission: mission, conditions: conditions)
+        let fresh = FlightSession(mission: mission, conditions: conditions)
+        fresh.returnsToNormalPlayback = returnsToNormalPlayback
+        return fresh
     }
 
     func swapNAVReceivers() {

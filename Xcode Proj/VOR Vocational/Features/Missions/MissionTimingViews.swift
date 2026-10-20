@@ -236,8 +236,20 @@ private extension MissionLegTiming.DurationEstimate {
     }
 }
 
+struct MissionPlaybackReturnToggle: View {
+    @Binding var isEnabled: Bool
+
+    var body: some View {
+        Toggle("Return to 1× with 1 minute remaining", isOn: $isEnabled)
+            .font(.caption)
+            .fixedSize(horizontal: false, vertical: true)
+            .help("Once per leg start, return accelerated playback to 1× at the still-air one-minute estimate. You can accelerate again afterward. Restarting a leg allows another return.")
+    }
+}
+
 struct MissionTimingPanel: View {
     @Bindable var session: FlightSession
+    @Binding var returnsToNormalPlayback: Bool
 
     var body: some View {
         if let timing = session.legTiming, let display = session.timingDisplay {
@@ -247,6 +259,7 @@ struct MissionTimingPanel: View {
                     HStack(alignment: .firstTextBaseline) {
                         Text("Still-air plan · \(timing.schedule.planningAirspeedKnots.formatted()) kt")
                             .font(.caption.weight(.semibold))
+                            .help("Planned reach is elapsed flight time. Still-air estimates assume the selected leg is flown correctly and do not confirm arrival.")
                         Spacer(minLength: 4)
                         Button("Undo timing start") { session.undoMissionLegStart() }
                             .buttonStyle(.bordered).controlSize(.small)
@@ -255,13 +268,14 @@ struct MissionTimingPanel: View {
                     if display.current == .selectLeg {
                         Text(display.current.label).font(.caption)
                     }
+                    MissionPlaybackReturnToggle(isEnabled: $returnsToNormalPlayback)
+                        .disabled(!session.canAdjustMissionTiming)
                 case .unavailable(let issue):
                     Text("Timing unavailable").font(.subheadline.weight(.semibold))
                     Text(issue.reason).font(.caption).foregroundStyle(ControlPalette.secondaryText)
                 }
             }
             .fixedSize(horizontal: false, vertical: true)
-            .help("Planned reach is elapsed flight time. Still-air estimates assume the selected leg is flown correctly and do not confirm arrival.")
         }
     }
 }

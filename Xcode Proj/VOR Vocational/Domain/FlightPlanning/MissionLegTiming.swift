@@ -9,6 +9,7 @@ nonisolated struct MissionLegTiming: Equatable {
         private(set) var estimatedDistanceNM = 0.0
         private(set) var expirySeconds: TimeInterval?
         private(set) var arithmeticIsValid = true
+        fileprivate(set) var hasConsumedPlaybackReturn = false
         private var distanceCompensation = 0.0
 
         init(legIndex: Int, startedAtSeconds: TimeInterval) {
@@ -92,6 +93,19 @@ nonisolated struct MissionLegTiming: Equatable {
         selectedContext = undoContext
         undoContext = nil
         canUndo = false
+    }
+
+    /// Only the selected, unexpired context can request a return. Playback and
+    /// the enabled choice belong to the session, not this still-air model.
+    func secondsUntilPlaybackReturn(at flightTime: TimeInterval, airspeedKnots: Double) -> TimeInterval? {
+        guard let context = selectedContext, !context.hasConsumedPlaybackReturn,
+              case .remaining(let remaining, _) = currentEstimate(at: flightTime, airspeedKnots: airspeedKnots)
+        else { return nil }
+        return max(0, remaining - 60)
+    }
+
+    mutating func consumePlaybackReturn() {
+        selectedContext?.hasConsumedPlaybackReturn = true
     }
 
     /// Both contexts receive the same accepted interval, so Undo restores the
