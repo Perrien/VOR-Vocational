@@ -15,6 +15,13 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View, ScreenOv
     private let screenOverlay: (ChartViewport) -> ScreenOverlay
     private let cameraPolicy: ChartCameraPolicy
     private let fitRequest: ChartFitRequest?
+    private let estimatedHeading: Binding<Double>?
+    private let nav1Override: Binding<NAVReceiver>?
+    private let nav2Override: Binding<NAVReceiver>?
+    private let onSwapOverride: (() -> Void)?
+    private let cockpitInputsEnabled: Bool
+    private let receptionEnabled: Bool
+    private let controlResetID: UUID?
 
     /// Mode-owned content beside the chart. Its visibility changes only the
     /// chart's available space, keeping the cockpit and flight session intact.
@@ -41,6 +48,13 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View, ScreenOv
          flightStatusHeight: CGFloat = 0,
          cameraPolicy: ChartCameraPolicy = .standard,
          fitRequest: ChartFitRequest? = nil,
+         estimatedHeading: Binding<Double>? = nil,
+         nav1Override: Binding<NAVReceiver>? = nil,
+         nav2Override: Binding<NAVReceiver>? = nil,
+         onSwapOverride: (() -> Void)? = nil,
+         cockpitInputsEnabled: Bool = true,
+         receptionEnabled: Bool = true,
+         controlResetID: UUID? = nil,
          @ViewBuilder sidePanel: @escaping () -> SidePanel = { EmptyView() },
          @ViewBuilder flightStatus: @escaping () -> FlightStatus = { EmptyView() },
          @ViewBuilder screenOverlay: @escaping (ChartViewport) -> ScreenOverlay = { _ in EmptyView() },
@@ -57,6 +71,13 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View, ScreenOv
         self.screenOverlay = screenOverlay
         self.cameraPolicy = cameraPolicy
         self.fitRequest = fitRequest
+        self.estimatedHeading = estimatedHeading
+        self.nav1Override = nav1Override
+        self.nav2Override = nav2Override
+        self.onSwapOverride = onSwapOverride
+        self.cockpitInputsEnabled = cockpitInputsEnabled
+        self.receptionEnabled = receptionEnabled
+        self.controlResetID = controlResetID
     }
 
     // The fixed VOR beacons on the land of Myosia.
@@ -143,20 +164,25 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View, ScreenOv
                         .frame(width: surfaceWidth, height: flightStatusHeight)
                 }
 
-                CockpitPanel(mapWidth: surfaceWidth, onSwap: { session.swapNAVReceivers() }) {
+                CockpitPanel(mapWidth: surfaceWidth, onSwap: {
+                    guard cockpitInputsEnabled else { return }
+                    if let onSwapOverride { onSwapOverride() }
+                    else { session.swapNAVReceivers() }
+                }) {
                     if configuration.showsHeadingPresentation {
-                        PlaneControlView(heading: session.heading,
-                                         selectedHeading: $session.selectedHeading,
+                        PlaneControlView(heading: estimatedHeading?.wrappedValue ?? session.heading,
+                                         selectedHeading: guarded(estimatedHeading ?? $session.selectedHeading),
                                          speedKnots: $session.speedKnots,
                                          isFlying: $session.isFlying,
                                          timeMultiplier: $session.timeMultiplier,
-                                         showsFlightControls: configuration.showsFlightControls)
+                                         showsFlightControls: configuration.showsFlightControls,
+                                         headingPresentation: estimatedHeading == nil ? .flight : .estimate)
                             .disabled(session.completion != nil || session.simulationError != nil)
                     }
                 } nav1: {
                     NavRadioView(
                         name: "NAV1",
-                        receiver: $session.nav1,
+                        receiver: guarded(nav1Override ?? $session.nav1),
                         stations: stations,
                         reading: nav1Reading.cdiReading,
                         normalizedAircraftPosition: receptionPosition ?? session.normalizedAircraftPosition,
@@ -170,7 +196,7 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View, ScreenOv
                 } nav2: {
                     NavRadioView(
                         name: "NAV2",
-                        receiver: $session.nav2,
+                        receiver: guarded(nav2Override ?? $session.nav2),
                         stations: stations,
                         reading: nav2Reading.cdiReading,
                         normalizedAircraftPosition: receptionPosition ?? session.normalizedAircraftPosition,
@@ -179,6 +205,8 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View, ScreenOv
                     )
                     .id("nav2-radio")
                 }
+                .disabled(!cockpitInputsEnabled)
+                .id(controlResetID)
             }
             // Re-clamp the pan whenever the zoom changes (e.g. via scroll) so
             // the map never drifts off the visible area.
@@ -424,7 +452,7 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View, ScreenOv
     }
 
     private func receiverReading(for receiver: NAVReceiver) -> ReceiverReading {
-        guard receiver.hasActiveFrequency else {
+        guard receptionEnabled, receiver.hasActiveFrequency else {
             return ReceiverReading(station: nil, cdiReading: .off)
         }
 
@@ -437,6 +465,15 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View, ScreenOv
             mapHeightNM: FlatMap.heightNM,
             cdiMax: session.cdiMax
         )
+    }
+
+    /// Mode-owned bindings can additionally synchronize and reject an expired attempt.
+    /// Defaults keep ordinary flight/stationary controls bound to their original session.
+    private func guarded<Value>(_ binding: Binding<Value>) -> Binding<Value> {
+        Binding(get: { binding.wrappedValue }, set: { value in
+            guard cockpitInputsEnabled else { return }
+            binding.wrappedValue = value
+        })
     }
 
     /// Converts a station's service volume into an unscaled map-space radius.
@@ -563,6 +600,7 @@ private struct FlightTimerView: View {
 /// modifier for scroll-wheel input on a plain view, so we install a local event
 /// monitor and report the vertical delta when the pointer is over this view.
 struct ScrollWheelReader: NSViewRepresentable {
+    @Environment(\.isEnabled) private var isEnabled
     /// Called with the vertical scroll delta (positive = scroll up) and the
     /// pointer position in this view's top-left-origin coordinate space.
     var onScroll: (CGFloat, CGPoint) -> Void
@@ -570,15 +608,20 @@ struct ScrollWheelReader: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = MonitorView()
         view.onScroll = onScroll
+        view.isScrollEnabled = isEnabled
         return view
     }
 
     func updateNSView(_ nsView: NSView, context: Context) {
-        (nsView as? MonitorView)?.onScroll = onScroll
+        if let view = nsView as? MonitorView {
+            view.onScroll = onScroll
+            view.isScrollEnabled = isEnabled
+        }
     }
 
     final class MonitorView: NSView {
         var onScroll: ((CGFloat, CGPoint) -> Void)?
+        var isScrollEnabled = true
         private var monitor: Any?
 
         override var isFlipped: Bool { true }
@@ -587,7 +630,7 @@ struct ScrollWheelReader: NSViewRepresentable {
             super.viewDidMoveToWindow()
             guard monitor == nil, window != nil else { return }
             monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
-                guard let self, let window = self.window, event.window == window else { return event }
+                guard let self, self.isScrollEnabled, let window = self.window, event.window == window else { return event }
                 // Only handle scrolls that land over the map area.
                 let frame = self.convert(self.bounds, to: nil)
                 guard frame.contains(event.locationInWindow) else { return event }

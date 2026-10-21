@@ -2496,6 +2496,260 @@ final class NavigationCoreTests: XCTestCase {
         }
     }
 
+    func testMovingCoverageAllowsChangingPairsAndRejectsSubsecondGaps() {
+        func station(_ id: String, _ x: Double, _ y: Double = 150) -> VORStation {
+            VORStation(id: id, name: id, identifier: id, frequency: 110,
+                location: .init(x: x / FlightWorld.widthNM, y: y / FlightWorld.heightNM),
+                type: .vor, serviceVolume: .terminal, elevationFT: 0, dme: false)
+        }
+        let start = FlightWorld.normalizedPosition(for: CGPoint(x: 100, y: 150))
+        let end = FlightWorld.normalizedPosition(for: CGPoint(x: 100 + 260.0 / 6, y: 150))
+        let firstPair = [station("A", 95), station("B", 95)]
+        let changing = firstPair + [station("C", 142), station("D", 142)]
+        XCTAssertTrue(MovingPositionChallenge.hasContinuousCoverage(from: start, to: end, stations: changing))
+        // Each endpoint has two stations, but a 0.001-NM gap lasts about 0.014 seconds.
+        let gap = firstPair + [station("C", 145.001), station("D", 145.001)]
+        for point in [start, end] {
+            XCTAssertEqual(gap.filter { VORNavigation.distanceNM(fromNormalized: point, toNormalized: $0.relativePosition,
+                mapWidthNM: FlightWorld.widthNM, mapHeightNM: FlightWorld.heightNM) <= $0.rangeNM }.count, 2)
+        }
+        XCTAssertFalse(MovingPositionChallenge.hasContinuousCoverage(from: start, to: end, stations: gap))
+        XCTAssertFalse(MovingPositionChallenge.hasContinuousCoverage(from: start, to: end,
+            stations: [station("ONE", 122), station("ONE", 122)]))
+        XCTAssertFalse(MovingPositionChallenge.hasContinuousCoverage(from: start, to: end,
+            stations: [station("ONE", 122), station("TANGENT", 122, 175)]))
+        XCTAssertFalse(MovingPositionChallenge.hasContinuousCoverage(from: CGPoint(x: CGFloat.nan, y: 0), to: end, stations: changing))
+    }
+
+    func testMovingScenarioRequiresFullTenMinuteExitBufferAndHasFiniteFailure() throws {
+        let stations = [makeStation(identifier: "ONE", x: 0.95, y: 0.5),
+                        makeStation(identifier: "TWO", x: 0.95, y: 0.5)]
+        let exactlyTen = CGPoint(x: (500 - 260.0 / 6) / 500, y: 0.5)
+        let accepted = try XCTUnwrap(MovingPositionChallenge.scenario(start: exactlyTen, heading: 90, stations: stations))
+        XCTAssertEqual(accepted.firstExit.elapsed, 600, accuracy: 1e-6)
+        XCTAssertNil(MovingPositionChallenge.scenario(start: CGPoint(x: 0.99, y: 0.5), heading: 90, stations: stations))
+        XCTAssertNil(MovingPositionChallenge.scenario(start: CGPoint(x: 1.1, y: 0.5), heading: 270, stations: stations))
+        var random = WindTestGenerator()
+        XCTAssertNil(MovingPositionChallenge.randomScenario(stations: [], using: &random, maxAttempts: 0))
+        XCTAssertEqual(random.calls, 0)
+        XCTAssertNil(MovingPositionChallenge.randomScenario(stations: [], using: &random, maxAttempts: 3))
+        XCTAssertGreaterThanOrEqual(random.calls, 9)
+    }
+
+    func testMovingBundledScenariosMeetIndependentDistanceRangeAndExitChecks() throws {
+        let known = try movingKnownScenario()
+        let startNM = FlightWorld.nauticalMiles(for: known.initialState.normalizedPosition)
+        let atMinute = FlightWorld.nauticalMiles(for: known.trajectory.state(at: 60).normalizedPosition)
+        XCTAssertEqual(atMinute.x - startNM.x, 260.0 / 60, accuracy: 1e-8)
+        XCTAssertEqual(atMinute.y, startNM.y, accuracy: 1e-8)
+        var random = WindTestGenerator()
+        var headings = Set<Double>()
+        for _ in 0..<12 {
+            let scenario = try XCTUnwrap(MovingPositionChallenge.randomScenario(stations: VORStation.myosia, using: &random))
+            headings.insert(scenario.initialState.heading)
+            let origin = FlightWorld.nauticalMiles(for: scenario.initialState.normalizedPosition)
+            let angle = scenario.initialState.heading * .pi / 180
+            let vx = sin(angle) * 260 / 3_600, vy = -cos(angle) * 260 / 3_600
+            var exitTimes: [Double] = []
+            if vx > 0 { exitTimes.append((500 - origin.x) / vx) }
+            if vx < 0 { exitTimes.append(-origin.x / vx) }
+            if vy > 0 { exitTimes.append((FlightWorld.heightNM - origin.y) / vy) }
+            if vy < 0 { exitTimes.append(-origin.y / vy) }
+            XCTAssertGreaterThanOrEqual(try XCTUnwrap(exitTimes.min()), 600)
+            XCTAssertEqual(scenario.firstExit.elapsed, try XCTUnwrap(exitTimes.min()), accuracy: 1e-6)
+            for second in stride(from: 0.0, through: 600, by: 1) {
+                let point = FlightWorld.normalizedPosition(for: CGPoint(x: origin.x + vx * second, y: origin.y + vy * second))
+                XCTAssertGreaterThanOrEqual(VORStation.myosia.filter {
+                    VORNavigation.distanceNM(fromNormalized: point, toNormalized: $0.relativePosition,
+                        mapWidthNM: FlightWorld.widthNM, mapHeightNM: FlightWorld.heightNM) <= $0.rangeNM
+                }.count, 2)
+            }
+        }
+        XCTAssertGreaterThan(headings.count, 1)
+    }
+
+    func testMovingResultsMeasurePhysicalDistanceAndShortestHeadingDifference() {
+        let actual = FlightAircraftState(normalizedPosition: FlightWorld.normalizedPosition(for: CGPoint(x: 100, y: 100)), heading: 359)
+        let estimate = MovingPositionChallenge.Estimate(position: FlightWorld.normalizedPosition(for: CGPoint(x: 103, y: 104)), heading: 1)
+        let result = MovingPositionChallenge.Result(estimate: estimate, actual: actual, elapsedSeconds: 67.25, ending: .submitted)
+        XCTAssertEqual(result.distanceErrorNM, 5, accuracy: 1e-9)
+        XCTAssertEqual(result.headingErrorDegrees, 2)
+        XCTAssertEqual(result.elapsedSeconds, 67.25)
+        let opposite = MovingPositionChallenge.Result(estimate: .init(position: actual.normalizedPosition, heading: 179),
+                                                      actual: actual, elapsedSeconds: 0, ending: .submitted)
+        XCTAssertEqual(opposite.headingErrorDegrees, 180)
+        XCTAssertEqual(opposite.distanceErrorNM, 0)
+    }
+
+    @MainActor
+    func testMovingAwakeTimeCatchesUpWithoutMovingOrSteeringTheEstimate() throws {
+        let scenario = try movingKnownScenario()
+        var instant = 100.0
+        let session = MovingPositionChallengeSession(now: { instant }, scenarioFactory: { scenario })
+        let frequent = MovingPositionChallengeSession(now: { instant }, scenarioFactory: { scenario })
+        session.begin()
+        frequent.begin()
+        let id = session.attemptID
+        session.setPosition(CGPoint(x: 0.4, y: 0.6), for: id)
+        session.setHeading(359, for: id)
+        let estimate = session.estimate
+        for second in 1...60 {
+            instant = 100 + Double(second)
+            frequent.refresh(for: frequent.attemptID)
+        }
+        session.refresh(for: id)
+        XCTAssertEqual(session.elapsedSeconds, 60)
+        XCTAssertEqual(session.actualState, scenario.trajectory.state(at: 60))
+        XCTAssertEqual(session.actualState, frequent.actualState)
+        XCTAssertEqual(session.elapsedSeconds, frequent.elapsedSeconds)
+        instant += 740 // Refresh delivery can be delayed/minimized; ten minutes is not a deadline.
+        session.refresh(for: id)
+        XCTAssertTrue(session.isActive)
+        XCTAssertEqual(session.elapsedSeconds, 800)
+        XCTAssertEqual(session.actualState, scenario.trajectory.state(at: 800))
+        XCTAssertEqual(session.estimate, estimate)
+        XCTAssertFalse(session.surface.isFlying)
+        XCTAssertNil(session.surface.recording)
+        // A repeated awake reading models a sleep interval; no duration is counted twice.
+        session.refresh(for: id)
+        XCTAssertEqual(session.elapsedSeconds, 800)
+        instant += 0.125
+        session.submit(for: id)
+        XCTAssertEqual(session.result?.elapsedSeconds, 800.125)
+        XCTAssertEqual(session.result?.actual, scenario.trajectory.state(at: 800.125))
+        XCTAssertEqual(session.result?.estimate, estimate)
+        let frozen = session.result
+        instant += 5
+        session.submit(for: id)
+        session.refresh(for: id)
+        XCTAssertEqual(session.result, frozen)
+    }
+
+    @MainActor
+    func testMovingInputsAreGatedAndAnEarlierBoundaryWinsAtSubmitOrEdit() throws {
+        let scenario = try movingKnownScenario()
+        var instant = 0.0
+        let session = MovingPositionChallengeSession(now: { instant }, scenarioFactory: { scenario })
+        let readyID = session.attemptID
+        var radio = NAVReceiver()
+        radio.tune(toFrequencyHundredths: 11680)
+        radio.obs = 123
+        session.setPosition(.zero, for: readyID)
+        session.setHeading(90, for: readyID)
+        session.setReceiver(radio, receiver: .nav1, for: readyID)
+        session.swapReceivers(for: readyID)
+        XCTAssertEqual(session.estimate, .initial)
+        XCTAssertEqual(session.surface.nav1, NAVReceiver())
+        session.begin()
+        let id = session.attemptID
+        session.setHeading(361, for: id)
+        session.setReceiver(radio, receiver: .nav1, for: id)
+        XCTAssertEqual(session.estimate.heading, 1)
+        session.swapReceivers(for: id)
+        XCTAssertEqual(session.surface.nav2, radio)
+        let submittedEstimate = session.estimate
+        instant = scenario.firstExit.elapsed
+        session.setPosition(.zero, for: id) // Must end before accepting this late estimate.
+        session.submit(for: id)
+        let result = try XCTUnwrap(session.result)
+        XCTAssertEqual(result.ending, .leftChart)
+        XCTAssertEqual(result.actual, scenario.firstExit.state)
+        XCTAssertEqual(result.elapsedSeconds, scenario.firstExit.elapsed)
+        XCTAssertEqual(result.estimate, submittedEstimate)
+        instant += 10
+        session.setHeading(270, for: id)
+        session.setReceiver(NAVReceiver(), receiver: .nav2, for: id)
+        session.swapReceivers(for: id)
+        session.refresh(for: id)
+        session.submit(for: id)
+        XCTAssertEqual(session.result, result)
+        XCTAssertEqual(session.surface.nav2, radio)
+
+        session.begin()
+        let laterID = session.attemptID
+        instant += scenario.firstExit.elapsed + 0.125
+        session.submit(for: laterID) // No refresh/edit first: Submit must find the earlier exit itself.
+        XCTAssertEqual(session.result?.ending, .leftChart)
+        XCTAssertEqual(session.result?.elapsedSeconds, scenario.firstExit.elapsed)
+        XCTAssertEqual(session.result?.actual, scenario.firstExit.state)
+    }
+
+    @MainActor
+    func testMovingRetryResetsInputsRetainsChartPreferencesAndRejectsOldCallbacks() throws {
+        let known = try movingKnownScenario()
+        var instant = 0.0
+        var draws = 0
+        let session = MovingPositionChallengeSession(now: { instant }, scenarioFactory: { draws += 1; return known })
+        session.begin()
+        let firstID = session.attemptID
+        session.setHeading(170, for: firstID)
+        session.setPosition(CGPoint(x: 0.2, y: 0.3), for: firstID)
+        var radio = NAVReceiver(); radio.obs = 200; radio.tune(toFrequencyHundredths: 11680)
+        session.setReceiver(radio, receiver: .nav1, for: firstID)
+        session.surface.showGrid = true
+        session.surface.showAirports = true
+        session.surface.gridSizeNM = 25
+        session.surface.zoom = 6
+        session.surface.pan = CGSize(width: 20, height: 40)
+        instant = 10
+        session.submit(for: firstID)
+        session.begin()
+        let secondID = session.attemptID
+        XCTAssertNotEqual(firstID, secondID)
+        XCTAssertEqual(draws, 2)
+        XCTAssertEqual(session.elapsedSeconds, 0)
+        XCTAssertEqual(session.estimate, .initial)
+        XCTAssertEqual(session.surface.nav1, NAVReceiver())
+        XCTAssertEqual(session.surface.nav2, NAVReceiver())
+        XCTAssertTrue(session.surface.showGrid)
+        XCTAssertTrue(session.surface.showAirports)
+        XCTAssertEqual(session.surface.gridSizeNM, 25)
+        XCTAssertEqual(session.surface.zoom, 1)
+        XCTAssertEqual(session.surface.pan, .zero)
+        instant += 5
+        session.submit(for: firstID)
+        session.setPosition(.zero, for: firstID)
+        session.setHeading(270, for: firstID)
+        session.setReceiver(radio, receiver: .nav1, for: firstID)
+        session.refresh(for: firstID)
+        XCTAssertEqual(session.elapsedSeconds, 0)
+        XCTAssertTrue(session.isActive)
+        XCTAssertEqual(session.estimate, .initial)
+        session.refresh(for: secondID)
+        XCTAssertEqual(session.elapsedSeconds, 5)
+        session.abandon()
+        session.refresh(for: secondID)
+        session.submit(for: secondID)
+        XCTAssertEqual(session.phase, .abandoned)
+        XCTAssertNil(session.result)
+        XCTAssertNil(session.actualState)
+    }
+
+    @MainActor
+    func testMovingImmediateSubmitAndGenerationFailureLeaveNoActiveAttempt() throws {
+        let known = try movingKnownScenario()
+        let session = MovingPositionChallengeSession(now: { 10 }, scenarioFactory: { known })
+        session.begin()
+        session.submit(for: session.attemptID)
+        XCTAssertEqual(session.result?.elapsedSeconds, 0)
+        XCTAssertEqual(session.result?.actual, known.initialState)
+        let failed = MovingPositionChallengeSession(now: { 10 }, scenarioFactory: { nil })
+        failed.begin()
+        failed.setHeading(90, for: failed.attemptID)
+        failed.submit(for: failed.attemptID)
+        XCTAssertEqual(failed.phase, .generationFailed)
+        XCTAssertEqual(failed.estimate, .initial)
+        XCTAssertNil(failed.actualState)
+        XCTAssertNil(failed.result)
+        XCTAssertEqual(MovingPositionChallengeSession.elapsedLabel(59.99), "0:59")
+        XCTAssertEqual(MovingPositionChallengeSession.elapsedLabel(3_601), "1:00:01")
+    }
+
+    private func movingKnownScenario() throws -> MovingPositionChallenge.Scenario {
+        try XCTUnwrap(MovingPositionChallenge.scenario(start:
+            FlightWorld.normalizedPosition(for: CGPoint(x: 260, y: 150)), heading: 90, stations: VORStation.myosia))
+    }
+
     private func makeTimingMission(distances: [Double] = [20, 4],
                                    policy: MissionTimingSchedule.StartupPolicy = .firstLegOnFirstPlay,
                                    initial: FlightAircraftState? = nil) -> MissionFlightDefinition {

@@ -18,9 +18,9 @@ Each entry is one individually addressable idea. Refer to its ID—for example, 
 
 ### I-005 — Guided lessons and richer Practice
 
-**Status:** In progress — Stage 1 implemented; owner checkpoint pending
+**Status:** In progress — Stage 1 committed; Stage 2 implemented through Debug Preview, owner checkpoint pending
 **Type:** Initiative
-**Next action:** Review Stage 1 of the [moving position and heading challenge plan](Plans/I-005-Moving-Position-And-Heading-Challenge.md), choose whether to commit, then authorize Stage 2
+**Next action:** Try Stage 2 of the [moving position and heading challenge plan](Plans/I-005-Moving-Position-And-Heading-Challenge.md), review its pending layout/input and actual sleep checks, choose whether to commit, then authorize Stage 3 catalog integration
 
 **What it is:** Add a timed, still-air position-and-heading challenge with a precise circle-and-arrow marker and separate distance error, heading error, and elapsed-time results. Reuse the circle without its arrow in the stationary challenge; combined scoring and guided lessons remain later scope.
 

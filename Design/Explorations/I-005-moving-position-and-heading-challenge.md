@@ -2,7 +2,7 @@
 
 [Idea index](../IDEAS.md#i-005--guided-lessons-and-richer-practice)
 
-Status: implementation in progress; Stage 1's shared marker and comparison preview are awaiting owner review. The [implementation plan](../Plans/I-005-Moving-Position-And-Heading-Challenge.md) covers this bounded extension of I-005; the moving attempt, guided lessons, and other Practice activities remain unimplemented. This exploration records the requirements and remains active until its bounded scope is complete.
+Status: implementation in progress. Stage 1's shared marker and comparison preview are committed in `abce716`. Stage 2's complete moving attempt is available through Debug → Practice Preview and awaits its owner commit/proceed checkpoint. The [implementation plan](../Plans/I-005-Moving-Position-And-Heading-Challenge.md) records checks and pending actual sleep, layout/input, and flight review. Normal Practice catalog integration is Stage 3; guided lessons and other Practice activities remain later work. This exploration records the requirements and remains active until its bounded scope and required review are complete.
 
 ## Purpose and requested experience
 
@@ -102,9 +102,9 @@ The exercise owns its ready, active, and completed states, validates each random
 
 This reuses the project's established simulation and chart foundations while keeping the moving exercise's estimate independent. Exact interfaces and changes belong in a later implementation plan.
 
-## Current behavior and foundations
+## Behavior and foundations at the start of exploration
 
-The README and source agree on the existing stationary exercise:
+The README and source agreed on the stationary exercise when this exploration began. Stage 1 has since replaced its aircraft guess icon with the precise arrowless circle; Stage 2 adds the moving exercise through Debug Preview. The original foundations were:
 
 - Practice currently has one actionable catalog entry, Position Challenge.
 - The hidden target is separate from the draggable aircraft icon used as the guess. Both NAV receivers read from the hidden target, independently of where the player places the guess.

@@ -52,4 +52,14 @@ struct FlightSurfaceConfiguration: Equatable {
     )
 
     static let transportMission = mission
+
+    /// The exercise owns continuous truth/time and draws only its independent estimate.
+    static let movingPositionChallenge = FlightSurfaceConfiguration(
+        showsAirportsByDefault: false,
+        showsSightseeingRegionNamesByDefault: false,
+        allowsAircraftSimulation: false,
+        showsHeadingPresentation: true,
+        showsFlightControls: false,
+        showsAircraftMarker: false
+    )
 }

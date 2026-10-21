@@ -30,15 +30,15 @@ A Practice exercise in which the app hides the real position, the player uses VO
 
 **Heading Indicator**
 
-The compass display showing heading and directional markings. In flight it shows the aircraft's actual heading. In the [planned moving Practice exercise](Explorations/I-005-moving-position-and-heading-challenge.md), it shows the player's estimated heading.
+The compass display showing heading and directional markings. In flight it shows the aircraft's actual heading. In the [moving Practice exercise](Explorations/I-005-moving-position-and-heading-challenge.md), currently available through Debug Preview, it shows the player's estimated heading.
 
 **Heading Knob**
 
-The rotary control used to set the aircraft heading. Turning left decreases the heading; turning right increases it. In the planned moving Practice exercise it adjusts estimated heading without steering the hidden aircraft.
+The rotary control used to set the aircraft heading. Turning left decreases the heading; turning right increases it. In the moving Practice exercise it adjusts estimated heading without steering the hidden aircraft.
 
 **Estimated heading**
 
-The player's guess of the aircraft's heading. In the planned moving Practice exercise, it determines the estimate marker's arrow direction and the numeric readout below the Heading Indicator; it does not change or reveal actual heading.
+The player's guess of the aircraft's heading. In the moving Practice exercise, it determines the estimate marker's arrow direction and the numeric readout below the Heading Indicator; it does not change or reveal actual heading.
 
 **VOR Indicator**
 

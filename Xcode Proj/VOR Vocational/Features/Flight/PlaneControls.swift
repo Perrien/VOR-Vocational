@@ -17,6 +17,8 @@ enum ControlPalette {
 }
 
 // MARK: - Plane Controls
+enum HeadingPresentation { case flight, estimate }
+
 /// The heading bay: a heading indicator — with the Heading Knob tucked into
 /// its lower-left corner — and, when enabled, a lower row of evenly spaced,
 /// same-height airspeed, playback, and Play/Pause controls.
@@ -36,6 +38,7 @@ struct PlaneControlView: View {
     /// Keeps the heading indicator at the same size as the NAV instruments
     /// even when a mode omits the flight-control row.
     var showsFlightControls = true
+    var headingPresentation: HeadingPresentation = .flight
 
     private static let timeMultiplierOptions: [Double] = [1, 5, 10, 30]
 
@@ -61,7 +64,8 @@ struct PlaneControlView: View {
                     ZStack {
                         HeadingIndicator(heading: heading,
                                          selectedHeading: selectedHeading,
-                                         diameter: diameter)
+                                         diameter: diameter,
+                                         presentation: headingPresentation)
                         RotaryKnob(value: $selectedHeading,
                                    diameter: knobDiameter,
                                    allowsRotationalDrag: false)
@@ -71,6 +75,11 @@ struct PlaneControlView: View {
 
                 if showsFlightControls {
                     flightControlsRow
+                } else if headingPresentation == .estimate {
+                    Text(String(format: "Estimated heading %03d°", Int(FlightPhysics.normalizedHeading(heading))))
+                        .font(.callout.monospacedDigit().weight(.semibold))
+                        .foregroundStyle(ControlPalette.cockpitAccent)
+                        .frame(height: lowerRowHeight)
                 } else {
                     Color.clear.frame(height: lowerRowHeight)
                 }
@@ -181,6 +190,7 @@ struct HeadingIndicator: View {
     let heading: Double
     let selectedHeading: Double
     var diameter: CGFloat = 150
+    var presentation: HeadingPresentation = .flight
 
     private var radius: CGFloat { diameter / 2 }
     private var scale: CGFloat { diameter / 150 }
@@ -198,11 +208,13 @@ struct HeadingIndicator: View {
 
             // The selected-heading bug moves immediately with the knob while
             // the compass card continues rotating gradually with the aircraft.
-            Image(systemName: "arrowtriangle.down.fill")
-                .foregroundStyle(ControlPalette.cockpitAccent)
-                .font(.system(size: 11 * scale))
-                .offset(y: -radius + 13 * scale)
-                .rotationEffect(.degrees(selectedHeading - heading))
+            if presentation == .flight {
+                Image(systemName: "arrowtriangle.down.fill")
+                    .foregroundStyle(ControlPalette.cockpitAccent)
+                    .font(.system(size: 11 * scale))
+                    .offset(y: -radius + 13 * scale)
+                    .rotationEffect(.degrees(selectedHeading - heading))
+            }
 
             // Fixed plane silhouette, always pointing "up" (toward the index).
             // The airplane symbol points east by default, so −90° faces it up.
@@ -213,8 +225,10 @@ struct HeadingIndicator: View {
                 .foregroundStyle(.white)
                 .rotationEffect(.degrees(-90))
 
-            headingReadout
-            selectedHeadingReadout
+            if presentation == .flight {
+                headingReadout
+                selectedHeadingReadout
+            }
 
             // Fixed heading index at the top (the lubber line).
             Image(systemName: "arrowtriangle.down.fill")
@@ -256,6 +270,7 @@ struct HeadingIndicator: View {
 /// degrees before applying it. Shared by the heading bay's Heading Knob and
 /// each NAV bay's OBS Dial — both turn a wrapped-degree value the same way.
 struct RotaryKnob: View {
+    @Environment(\.isEnabled) private var isEnabled
     @Binding var value: Double
     var diameter: CGFloat = 40
     /// The heading knob is scroll-only, which prevents a fast pointer drag
@@ -310,6 +325,7 @@ struct RotaryKnob: View {
     private var rotationDrag: some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { dragValue in
+                guard isEnabled else { return }
                 let center = CGPoint(x: radius, y: radius)
                 let angle = atan2(dragValue.location.y - center.y,
                                   dragValue.location.x - center.x) * 180 / .pi
@@ -331,6 +347,7 @@ struct RotaryKnob: View {
     /// the scroll wheel, applying whole-degree turns as they cross and
     /// carrying any leftover fraction forward so slow input isn't dropped.
     private func accumulate(_ delta: Double) {
+        guard isEnabled, delta.isFinite else { return }
         accumulatedDelta += delta
         let wholeDegrees = accumulatedDelta.rounded(.towardZero)
         if wholeDegrees != 0 {
@@ -354,11 +371,11 @@ struct RotaryKnob: View {
 /// the tuned frequency.
 ///
 /// Typing a station's ident (e.g. "CTR") tunes the receiver to that station's
-/// frequency and turns the frequency green, but only once that station is in
-/// range. A known but out-of-range ident clears the active frequency so a
-/// previous station cannot remain falsely connected; unmatched or partial
-/// input leaves the receiver alone.
+/// frequency immediately. The ident/frequency appear green while in range;
+/// an out-of-range selection retains its channel with the NAV flag until
+/// reception becomes available. Unmatched or partial input leaves tuning alone.
 struct NavRadioView: View {
+    @Environment(\.isEnabled) private var isEnabled
     let name: String
     @Binding var receiver: NAVReceiver
     /// All bundled stations, used to resolve a typed ident.
@@ -450,6 +467,9 @@ struct NavRadioView: View {
         }
         .onAppear { syncIdentFromReceiver() }
         .onChange(of: receiver.frequencyHundredths) { _, _ in syncIdentFromReceiver() }
+        .onChange(of: isEnabled) { _, enabled in
+            if !enabled { syncIdentFromReceiver() }
+        }
     }
 
     /// The indicator fills the width, bounded by the height left over above
@@ -463,6 +483,7 @@ struct NavRadioView: View {
         Binding(
             get: { Double(receiver.obs) },
             set: { newValue in
+                guard isEnabled else { return }
                 let wrapped = Int(newValue.rounded()) % 360
                 receiver.obs = wrapped < 0 ? wrapped + 360 : wrapped
             }
@@ -477,6 +498,7 @@ struct NavRadioView: View {
         Binding(
             get: { identText },
             set: { newValue in
+                guard isEnabled else { return }
                 identText = String(newValue.uppercased().prefix(3))
                 if let station = VORNavigation.station(withIdent: identText, in: stations) {
                     receiver.tune(toFrequencyHundredths: Int((station.frequency * 100).rounded()))
@@ -514,6 +536,7 @@ struct CDIMaxField: View {
 /// The OBS/CDI instrument: a draggable compass card, course index, CDI needle,
 /// and TO/FROM flag. Dragging anywhere on the dial rotates the selected course.
 struct OBSInstrument: View {
+    @Environment(\.isEnabled) private var isEnabled
     @Binding var obs: Double
     let reading: CDIReading
     var diameter: CGFloat = 178
@@ -653,6 +676,7 @@ struct OBSInstrument: View {
     private var rotationDrag: some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
+                guard isEnabled else { return }
                 let center = CGPoint(x: radius, y: radius)
                 let angle = atan2(value.location.y - center.y,
                                   value.location.x - center.x) * 180 / .pi
@@ -676,6 +700,7 @@ struct OBSInstrument: View {
     /// away by `obs`'s whole-degree storage instead of accumulating, which
     /// reads as the dial pausing and then jumping. Mirrors `RotaryKnob.accumulate(_:)`.
     private func accumulate(_ delta: Double) {
+        guard isEnabled, delta.isFinite else { return }
         accumulatedDelta += delta
         let wholeDegrees = accumulatedDelta.rounded(.towardZero)
         if wholeDegrees != 0 {

@@ -1,7 +1,7 @@
 #if DEBUG
 import SwiftUI
 
-/// Static development fixtures, independent of the later moving-attempt engine.
+/// Static visual fixtures and complete moving attempts, available only in Debug builds.
 struct PracticePreviewView: View {
     private enum Preset: String, CaseIterable, Identifiable {
         case markerDrag = "Marker drag"
@@ -11,6 +11,10 @@ struct PracticePreviewView: View {
         case near = "1 NM"
         case wide = "100 NM"
         case edge = "Full-chart edge/corner"
+        case randomAttempt = "Random valid attempt"
+        case knownAttempt = "Known eastbound attempt"
+        case unavailable = "Generation unavailable"
+        case nearExit = "Near-exit attempt"
         var id: Self { self }
     }
 
@@ -23,6 +27,8 @@ struct PracticePreviewView: View {
     @State private var showsPanel = true
     @State private var chartSize = CGSize.zero
     @State private var fitRevision = 0
+    @State private var movingSession: MovingPositionChallengeSession?
+    @State private var showsTruth = false
 
     private let configuration = FlightSurfaceConfiguration(
         showsAirportsByDefault: false, showsSightseeingRegionNamesByDefault: false,
@@ -30,6 +36,7 @@ struct PracticePreviewView: View {
         showsFlightControls: false, showsAircraftMarker: false)
 
     private var isPlacement: Bool { preset == .markerDrag }
+    private var isMoving: Bool { [.randomAttempt, .knownAttempt, .unavailable, .nearExit].contains(preset) }
     private var cameraPolicy: ChartCameraPolicy { isPlacement ? .fullChart : .comparison }
     private var actualPosition: CGPoint {
         preset == .edge ? CGPoint(x: 1, y: 0) : CGPoint(x: 0.5, y: 0.5)
@@ -39,6 +46,28 @@ struct PracticePreviewView: View {
     }
 
     var body: some View {
+        Group {
+            if isMoving, let movingSession {
+                MovingPositionChallengeView(session: movingSession,
+                    onPractice: { preset = .markerDrag }, onHome: { preset = .markerDrag },
+                    developmentNote: preset == .nearExit
+                        ? "Debug fixture: chart exit after 5 seconds. This bypasses the production ten-minute/radio guarantee."
+                        : (preset == .knownAttempt ? "Debug fixture: known eastbound flight; normal scenario validation applies." : nil))
+                    .overlay(alignment: .bottomLeading) {
+                        if showsTruth { truthPanel(movingSession) }
+                    }
+                    .id(ObjectIdentifier(movingSession))
+            } else {
+                staticPreview
+            }
+        }
+        .overlay(alignment: .topLeading) { selector }
+        .background(Color(nsColor: .windowBackgroundColor))
+        .onAppear { reset() }
+        .onChange(of: preset) { reset() }
+    }
+
+    private var staticPreview: some View {
         MapView(session: session, configuration: configuration,
                     receptionPosition: actualPosition,
                     sidePanelTitle: "Practice", isSidePanelPresented: $showsPanel,
@@ -60,23 +89,44 @@ struct PracticePreviewView: View {
                         .onChange(of: viewport.size) { _, size in chartSize = size }
                     })
             .id(preset)
-            .overlay(alignment: .topLeading) {
-                HStack {
-                    Text("Practice Preview").font(.headline)
-                    Picker("Preset", selection: $preset) {
-                        ForEach(Preset.allCases) { Text($0.rawValue).tag($0) }
-                    }
-                    .frame(width: 360)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-                .padding(.leading, 16)
-                .padding(.top, 40)
+    }
+
+    private var selector: some View {
+        HStack(spacing: 8) {
+            if !isMoving { Text("Practice Preview").font(.headline) }
+            Picker("Preset", selection: $preset) {
+                ForEach(Preset.allCases) { Text($0.rawValue).tag($0) }
             }
-        .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear { reset() }
-        .onChange(of: preset) { reset() }
+            .labelsHidden()
+            .frame(width: isMoving ? 240 : 360)
+            if isMoving { Toggle("Truth", isOn: $showsTruth).toggleStyle(.checkbox) }
+        }
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .padding(.leading, isMoving ? 300 : 16).padding(.top, 40)
+    }
+
+    private func truthPanel(_ attempt: MovingPositionChallengeSession) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("DEBUG TRUTH").font(.caption.bold())
+            if let actual = attempt.actualState {
+                let nm = FlightWorld.nauticalMiles(for: actual.normalizedPosition)
+                Text(String(format: "Actual %.2f E / %.2f S NM · %03d°", nm.x, nm.y, Int(actual.heading)))
+                Text(String(format: "Awake elapsed %.3f s", attempt.elapsedSeconds))
+                Button("Use truth as estimate") {
+                    let id = attempt.attemptID
+                    attempt.refresh(for: id)
+                    if let state = attempt.actualState {
+                        attempt.setPosition(state.normalizedPosition, for: id)
+                        attempt.setHeading(state.heading, for: id)
+                    }
+                }
+                .disabled(!attempt.isActive)
+            } else { Text("No aircraft generated") }
+        }
+        .font(.caption.monospacedDigit())
+        .padding(10).background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+        .padding(16)
     }
 
     private var inspector: some View {
@@ -100,7 +150,7 @@ struct PracticePreviewView: View {
             }
             Text("Zoom: \(session.zoom, specifier: "%.2f")×").monospacedDigit()
             Button("Reset preset", action: reset)
-            Text("Development data only. The moving challenge is not connected yet.")
+            Text("Static development data. Choose Random valid attempt for the timed moving exercise.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .foregroundStyle(ControlPalette.primaryText)
@@ -138,6 +188,23 @@ struct PracticePreviewView: View {
     }
 
     private func reset() {
+        movingSession?.abandon()
+        movingSession = nil
+        showsTruth = false
+        if isMoving {
+            switch preset {
+            case .randomAttempt: movingSession = MovingPositionChallengeSession()
+            case .knownAttempt:
+                movingSession = MovingPositionChallengeSession(scenarioFactory: {
+                    MovingPositionChallenge.scenario(start: FlightWorld.normalizedPosition(for: CGPoint(x: 260, y: 150)),
+                                                       heading: 90, stations: VORStation.myosia)
+                })
+            case .nearExit:
+                movingSession = MovingPositionChallengeSession(scenarioFactory: { MovingPositionChallenge.debugNearExitScenario() })
+            default: movingSession = MovingPositionChallengeSession(scenarioFactory: { nil })
+            }
+            return
+        }
         let fresh = FlightSession(normalizedAirportPosition: CGPoint(x: 0.5, y: 0.5))
         fresh.showAirports = false
         fresh.showRadials = false
