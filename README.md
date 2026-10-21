@@ -11,7 +11,7 @@ What can be tried today:
 - Fly a heading-and-airspeed simulation with direct 3°/second turns, steady wind drift, pause, and playback controls. Physical movement uses the source chart calibration and is independent of window size, zoom, pan, or the displayed crop. Mission flights end at the first outward full-source chart crossing; Free Flight can move beyond the visible crop without a mission ending.
 - Use two frequency-tuned NAV receivers with OBS, CDI display, TO/FROM indications, station range handling, and a NAV1/NAV2 swap.
 - Pan and zoom the chart; show airports, VORs, selected-station range rings, radials, a grid, and sightseeing markers.
-- Start a Position Challenge, use the instruments to infer a hidden location, drag the aircraft marker to the guess, and see the error in nautical miles. Its stationary guess marker cannot be moved by flight simulation.
+- Start a Position Challenge, use the instruments to infer a hidden location, drag the precise circle marker to the guess, and see the error in nautical miles. Its center dot marks the exact guess; the circle's interior and surrounding buffer are draggable, and no heading arrow appears in this position-only exercise. Flight simulation cannot move it.
 - Open Missions → Transport → Briefing to inspect the supplied Silverkeep-to-Midland route, its 99.2-NM still-air plan, and five VOR instructions; then fly it from Silverkeep using the cockpit instruments. The live mission deliberately hides the aircraft's true chart position and planned route.
 - Read live Transport or Position Challenge instructions and results in the panel beside the chart, above the full-width cockpit. Use Hide Mission / Show Mission or Hide Practice / Show Practice beside Chart to collapse or reopen it.
 - During Transport, scroll through all five instructions and check off each step yourself. Check or clear any step independently; hiding the panel retains your checks, and Fly Again clears them.
@@ -65,6 +65,8 @@ The intended shape is simple: the world and aircraft state feed the receiver/ins
 - The chart supports navigation but should not reveal the answer during normal mission play.
 - The current model intentionally has heading, constant airspeed, steady wind, and playback speed only—no altitude, terrain, aircraft performance, gusts, or changing weather.
 - The app is Mac-first and remains a single macOS target for the current roadmap.
+
+The next Practice extension, [I-005 — moving position and heading challenge](Design/Explorations/I-005-moving-position-and-heading-challenge.md), has an [implementation plan](Design/Plans/I-005-Moving-Position-And-Heading-Challenge.md). Stage 1 adds the shared precise marker to stationary Practice and a Debug → Practice Preview window (also available from Window → Practice Preview). Choose Marker drag to test the arrow/interior/buffer at 1–6×, or static comparison presets for tiny, coincident, wide, and full-chart-edge errors. Comparison provides separate Estimate/Actual circle-and-arrow styles, close automatic fitting, zoom/pan, and Fit Comparison; panel toggles and resizing refit the same positions. These are development fixtures; the timed moving exercise is not implemented yet. Stage 1 awaits owner review before Stage 2 begins.
 
 ## Project documents
 

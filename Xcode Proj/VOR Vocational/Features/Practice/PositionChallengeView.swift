@@ -2,7 +2,7 @@ import SwiftUI
 
 /// A third Mode-boundary wrapper alongside `FreeFlightView` (ADR-0001): owns
 /// one `FlightSession`, whose `normalizedAircraftPosition` doubles as the
-/// player's guess marker exactly as `MapView`'s existing plane-drag already
+/// player's precise, arrowless guess marker through `MapView`'s existing drag
 /// works, and one `PositionChallenge.State`. Renders `MapView` with the
 /// hidden target as its reception position, so the NAV radios read as if
 /// standing at the target rather than at the freely-dragged guess, plus the
@@ -29,9 +29,9 @@ struct PositionChallengeView: View {
                 isSidePanelPresented: $showsPracticePanel,
                 sidePanel: {
                     PositionChallengePanel(state: state, onStart: start, onCheck: check, onReset: start)
-                }) { imageRect in
-            challengeOverlay(imageRect: imageRect)
-        }
+                }, chartOverlay: { imageRect in
+                    challengeOverlay(imageRect: imageRect)
+                })
         .overlay(alignment: .topLeading) {
             HomeControl(action: onHome)
                 .padding(.top, 40)
@@ -115,7 +115,7 @@ struct PositionChallengePanel: View {
 
             switch state {
             case .inactive:
-                Text("Tune in-range VORs, dial OBS until the needles center, then drag the plane to your fix.")
+                Text("Tune in-range VORs, dial OBS until the needles center, then drag the circle to your fix.")
                     .font(.caption)
                     .foregroundStyle(ControlPalette.secondaryText)
                 Button("Start Challenge", action: onStart)
@@ -123,7 +123,7 @@ struct PositionChallengePanel: View {
                     .tint(ControlPalette.accent)
 
             case .active:
-                Text("Drag the plane to where you think you are.")
+                Text("Drag the circle's center to where you think you are.")
                     .font(.caption)
                     .foregroundStyle(ControlPalette.secondaryText)
                 Button("Check Placement", action: onCheck)

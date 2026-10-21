@@ -16,6 +16,18 @@ Each entry is one individually addressable idea. Refer to its ID—for example, 
 
 **Delivered scope:** [Archived wind, flight recording, and first debrief plan](Archived/Plans/I-003-Wind-Recording-Debrief.md)
 
+### I-005 — Guided lessons and richer Practice
+
+**Status:** In progress — Stage 1 implemented; owner checkpoint pending
+**Type:** Initiative
+**Next action:** Review Stage 1 of the [moving position and heading challenge plan](Plans/I-005-Moving-Position-And-Heading-Challenge.md), choose whether to commit, then authorize Stage 2
+
+**What it is:** Add a timed, still-air position-and-heading challenge with a precise circle-and-arrow marker and separate distance error, heading error, and elapsed-time results. Reuse the circle without its arrow in the stationary challenge; combined scoring and guided lessons remain later scope.
+
+**Exploration:** [Moving position and heading challenge](Explorations/I-005-moving-position-and-heading-challenge.md)
+
+**Plan:** [Moving position and heading challenge](Plans/I-005-Moving-Position-And-Heading-Challenge.md)
+
 ## Later
 
 ### I-004 — Self-planned transport flight
@@ -27,16 +39,6 @@ Each entry is one individually addressable idea. Refer to its ID—for example, 
 **What it is:** Let the player author a transport route using airports, VORs, and two-radial intersections; validate it, save it apart from bundled content, and fly it through the mission loop.
 
 **Already decided:** It should use the same flight-plan geometry as supplied missions.
-
-### I-005 — Guided lessons and richer Practice
-
-**Status:** Later
-**Type:** Initiative
-**Next action:** `a-explore I-005`
-
-**What it is:** Add guided lessons for reading a VOR, finding position with two VORs, and intercepting/tracking a radial.
-
-**Already decided:** Difficulty should come from fewer aids and better decisions, not arbitrary controls. Position Challenge is the first working Practice activity.
 
 ### I-006 — Sightseeing mission
 

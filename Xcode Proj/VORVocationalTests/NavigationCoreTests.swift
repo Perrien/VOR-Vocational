@@ -232,7 +232,8 @@ final class NavigationCoreTests: XCTestCase {
                 allowsAircraftSimulation: false,
                 showsHeadingPresentation: true,
                 showsFlightControls: false,
-                showsAircraftMarker: true
+                showsAircraftMarker: true,
+                aircraftMarkerStyle: .positionEstimate
             )
         )
         XCTAssertEqual(
@@ -2369,6 +2370,130 @@ final class NavigationCoreTests: XCTestCase {
         XCTAssertEqual(fresh.timeMultiplier, 30)
         XCTAssertEqual(fresh.legTiming?.selectedContext?.hasConsumedPlaybackReturn, false)
         XCTAssertFalse(FlightSession(mission: mission, conditions: .calm).returnsToNormalPlayback)
+    }
+
+    func testChartViewportRetainsDefaultCropProjectionAndPanLimits() {
+        let size = CGSize(width: 759, height: 410)
+        let position = CGPoint(x: 0.37, y: 0.61)
+        let image = FlatMap.fittedRect(in: size)
+        let unscaled = FlatMap.point(for: position, in: image)
+        let viewport = ChartViewport(size: size, zoom: 3, pan: CGSize(width: 70, height: -35))
+        assertPoint(viewport.point(for: position), equals: CGPoint(
+            x: (unscaled.x - size.width / 2) * 3 + size.width / 2 + 70,
+            y: (unscaled.y - size.height / 2) * 3 + size.height / 2 - 35))
+        XCTAssertEqual(viewport.imageRect, image)
+        XCTAssertEqual(ChartCameraPolicy.standard.clampedPan(CGSize(width: 9_000, height: -9_000), zoom: 3, size: size),
+                       CGSize(width: 759, height: -410))
+        XCTAssertEqual(ChartCameraPolicy.standard.clampedPan(CGSize(width: 70, height: -35), zoom: 1, size: size), .zero)
+        XCTAssertEqual(FlatMap.sourcePosition(for: image.origin, in: image), FlatMap.sourceCrop.origin)
+    }
+
+    func testChartViewportRoundTripsFullSourceAtCloseAndOrdinaryZoom() throws {
+        for size in [CGSize(width: 759, height: 366), CGSize(width: 1_500, height: 650)] {
+            for zoom: CGFloat in [0.5, 1, 6, 4_000] {
+                let viewport = ChartViewport(size: size, crop: ChartCameraPolicy.fullChart.crop,
+                                             zoom: zoom, pan: CGSize(width: 27, height: -19))
+                for position in [CGPoint(x: 0.1, y: 0.2), CGPoint(x: 0.5, y: 0.5), CGPoint(x: 0.9, y: 0.8)] {
+                    let restored = try XCTUnwrap(viewport.position(at: viewport.point(for: position)))
+                    assertPoint(restored, equals: position)
+                }
+                XCTAssertEqual(viewport.pointsPerNM / zoom, viewport.imageRect.width / FlightWorld.widthNM, accuracy: 1e-9)
+            }
+        }
+    }
+
+    func testChartMarkerTranslationPreservesGrabOffsetAndClampsToSourceBounds() {
+        let viewport = ChartViewport(size: CGSize(width: 1_000, height: 600), crop: ChartCameraPolicy.fullChart.crop, zoom: 6)
+        let start = CGPoint(x: 0.5, y: 0.5)
+        assertPoint(viewport.moving(start, by: .zero), equals: start)
+        let moved = viewport.moving(start, by: CGSize(width: 92, height: -35))
+        let before = viewport.point(for: start), after = viewport.point(for: moved)
+        XCTAssertEqual(after.x - before.x, 92, accuracy: 1e-8)
+        XCTAssertEqual(after.y - before.y, -35, accuracy: 1e-8)
+        assertPoint(viewport.moving(start, by: CGSize(width: -1e9, height: 1e9)), equals: CGPoint(x: 0, y: 1))
+        let cropped = ChartViewport(size: viewport.size)
+        assertPoint(cropped.moving(start, by: CGSize(width: -1e9, height: -1e9)), equals: FlatMap.sourceCrop.origin)
+    }
+
+    func testPracticeComparisonFitsTinyCoincidentWideAndFullChartEdgeSymbols() throws {
+        let center = CGPoint(x: 0.5, y: 0.5)
+        let cases: [[CGPoint]] = [[center, center],
+            [center, CGPoint(x: 0.5 + 0.01 / FlightWorld.widthNM, y: 0.5)],
+            [center, CGPoint(x: 0.5 + 1 / FlightWorld.widthNM, y: 0.5)],
+            [center, CGPoint(x: 0.5 + 100 / FlightWorld.widthNM, y: 0.5)],
+            [CGPoint(x: 0, y: 1), CGPoint(x: 1, y: 0)],
+            [CGPoint.zero, CGPoint.zero], [CGPoint(x: 1, y: 1), CGPoint(x: 1, y: 1)]]
+        for size in [CGSize(width: 759, height: 366), CGSize(width: 1_100, height: 366), CGSize(width: 1_500, height: 650)] {
+            for positions in cases {
+                let base = ChartViewport(size: size, crop: ChartCameraPolicy.comparison.crop)
+                let request = ChartFitRequest(positions: positions)
+                let camera = try XCTUnwrap(base.fitting(request, policy: .comparison))
+                let fitted = ChartViewport(size: size, crop: base.crop, zoom: camera.zoom, pan: camera.pan)
+                let bounds = request.centerBounds(in: size).insetBy(dx: -1e-6, dy: -1e-6)
+                for position in positions {
+                    let point = fitted.point(for: position)
+                    XCTAssertTrue(bounds.contains(point), "Position \(position) outside padded fit at \(size)")
+                    let symbol = CGRect(x: point.x - 43, y: point.y - 43, width: 86, height: 86)
+                    XCTAssertTrue(CGRect(x: 0, y: 80, width: size.width, height: size.height - 80).contains(symbol))
+                }
+                let labels = PracticeComparisonLabelLayout.rectangles(
+                    estimate: fitted.point(for: positions[0]), actual: fitted.point(for: positions[1]), size: size)
+                XCTAssertFalse(labels[0].intersects(labels[1]))
+                XCTAssertTrue(labels.allSatisfy { CGRect(origin: .zero, size: size).contains($0) })
+                if positions == [center, center] { XCTAssertGreaterThan(camera.zoom, 6) }
+            }
+        }
+    }
+
+    func testPracticeComparisonPointerZoomKeepsTheSameGeographicPoint() throws {
+        let policy = ChartCameraPolicy.comparison
+        let original = ChartViewport(size: CGSize(width: 759, height: 366), crop: policy.crop,
+                                     zoom: 25, pan: CGSize(width: 20, height: -30))
+        let pointer = CGPoint(x: 500, y: 220)
+        let position = try XCTUnwrap(original.position(at: pointer))
+        let camera = original.zoomed(by: 1.25, anchoredAt: pointer, policy: policy)
+        let zoomed = ChartViewport(size: original.size, crop: policy.crop, zoom: camera.zoom, pan: camera.pan)
+        assertPoint(zoomed.point(for: position), equals: pointer)
+        let limit = original.zoomed(by: 1e9, anchoredAt: pointer, policy: policy)
+        XCTAssertEqual(limit.zoom, policy.zoomRange.upperBound)
+        XCTAssertEqual(original.zoomed(by: .nan, anchoredAt: pointer, policy: policy), original.camera)
+    }
+
+    func testPracticeRefittingRetainsFrozenPositionsAcrossResize() throws {
+        let positions = [CGPoint(x: 0.51, y: 0.47), CGPoint(x: 0.5101, y: 0.4701)]
+        let request = ChartFitRequest(positions: positions)
+        let distance = VORNavigation.distanceNM(fromNormalized: positions[0], toNormalized: positions[1],
+                                              mapWidthNM: FlightWorld.widthNM, mapHeightNM: FlightWorld.heightNM)
+        for size in [CGSize(width: 759, height: 366), CGSize(width: 1_100, height: 700)] {
+            let viewport = ChartViewport(size: size, crop: ChartCameraPolicy.comparison.crop)
+            let camera = try XCTUnwrap(viewport.fitting(request, policy: .comparison))
+            let fitted = ChartViewport(size: size, crop: viewport.crop, zoom: camera.zoom, pan: camera.pan)
+            let a = fitted.point(for: positions[0]), b = fitted.point(for: positions[1])
+            XCTAssertEqual(hypot(a.x - b.x, a.y - b.y) / fitted.pointsPerNM, distance, accuracy: 1e-9)
+        }
+        XCTAssertEqual(request.positions, positions)
+        XCTAssertNil(ChartViewport(size: CGSize(width: 759, height: 366)).fitting(ChartFitRequest(positions: []), policy: .comparison))
+    }
+
+    func testPreciseMarkerIncludesTransparentInteriorArrowAndBufferAtEveryHeading() {
+        let stationary = PositionEstimateMarkerGeometry(role: .estimate, showsArrow: false)
+        XCTAssertTrue(stationary.contains(.zero))
+        XCTAssertTrue(stationary.contains(CGPoint(x: 7, y: 7)))
+        XCTAssertTrue(stationary.contains(CGPoint(x: stationary.radius + 10, y: 0)))
+        XCTAssertFalse(stationary.contains(CGPoint(x: stationary.hitRadius + 1, y: 0)))
+        XCTAssertTrue(stationary.arrowPoints(heading: 45).isEmpty)
+        for role in [PositionEstimateMarkerGeometry.Role.estimate, .actual] {
+            let geometry = PositionEstimateMarkerGeometry(role: role, showsArrow: true)
+            for heading in stride(from: 0.0, to: 360, by: 45) {
+                for point in geometry.arrowPoints(heading: heading) {
+                    for angle in stride(from: 0.0, to: 360, by: 45) {
+                        let buffered = CGPoint(x: point.x + 10 * cos(angle * .pi / 180),
+                                               y: point.y + 10 * sin(angle * .pi / 180))
+                        XCTAssertTrue(geometry.contains(buffered))
+                    }
+                }
+            }
+        }
     }
 
     private func makeTimingMission(distances: [Double] = [20, 4],

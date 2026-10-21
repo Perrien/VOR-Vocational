@@ -30,6 +30,9 @@ struct VORVocationalApp: App {
                 Button("Mission Runner Preview") {
                     openWindow(id: "mission-runner-preview")
                 }
+                Button("Practice Preview") {
+                    openWindow(id: "practice-preview")
+                }
             }
         }
         #endif
@@ -41,6 +44,10 @@ struct VORVocationalApp: App {
         }
         Window("Mission Runner Preview", id: "mission-runner-preview") {
             MissionRunnerPreviewView()
+                .frame(minWidth: 1100, minHeight: 760)
+        }
+        Window("Practice Preview", id: "practice-preview") {
+            PracticePreviewView()
                 .frame(minWidth: 1100, minHeight: 760)
         }
         #endif

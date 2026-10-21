@@ -19,30 +19,30 @@ struct FlatMap: View {
 
     /// Native aspect ratio of the uncropped source artwork. This remains the
     /// calibration basis for the 500-NM-wide navigation world.
-    static let sourceMapAspect = CGFloat(FlightWorld.sourceAspect)
+    nonisolated static let sourceMapAspect = CGFloat(FlightWorld.sourceAspect)
 
     /// The source map's real-world width, in nautical miles. Shared by the
     /// flight surface and Flight Diagnostics so both compute reception and
     /// CDI from the same scale.
-    static let widthNM = FlightWorld.widthNM
+    nonisolated static let widthNM = FlightWorld.widthNM
 
     /// The source map's real-world height, derived from its own aspect ratio
     /// so north-south distances use the same NM-per-pixel scale as east-west.
-    static let heightNM = FlightWorld.heightNM
+    nonisolated static let heightNM = FlightWorld.heightNM
 
     /// Presentation crop measured from the supplied red guide: x 178...3118,
     /// y 264...2036 in the 3496 × 2508 PNG. Edit these normalized values to
     /// reframe the map without rewriting station, airport, or mission data.
-    static let sourceCrop = CGRect(x: 178.0 / 3496.0,
+    nonisolated static let sourceCrop = CGRect(x: 178.0 / 3496.0,
                                    y: 264.0 / 2508.0,
                                    width: 2940.0 / 3496.0,
                                    height: 1772.0 / 2508.0)
 
     /// Aspect ratio of the visible crop, not the whole source artwork.
-    static let mapAspect: CGFloat = sourceMapAspect * sourceCrop.width / sourceCrop.height
+    nonisolated static let mapAspect: CGFloat = sourceMapAspect * sourceCrop.width / sourceCrop.height
 
     /// Aspect-fits the map artwork within `area`, centered.
-    static func fittedRect(in area: CGSize, crop: CGRect = sourceCrop) -> CGRect {
+    nonisolated static func fittedRect(in area: CGSize, crop: CGRect = sourceCrop) -> CGRect {
         guard area.width > 0, area.height > 0 else { return .zero }
         let areaAspect = area.width / area.height
         let aspect = sourceMapAspect * crop.width / crop.height
@@ -58,7 +58,7 @@ struct FlatMap: View {
     }
 
     /// Projects a full-source normalized coordinate into the cropped image rect.
-    static func point(for sourcePosition: CGPoint, in imageRect: CGRect, crop: CGRect = sourceCrop) -> CGPoint {
+    nonisolated static func point(for sourcePosition: CGPoint, in imageRect: CGRect, crop: CGRect = sourceCrop) -> CGPoint {
         CGPoint(
             x: imageRect.minX + (sourcePosition.x - crop.minX) / crop.width * imageRect.width,
             y: imageRect.minY + (sourcePosition.y - crop.minY) / crop.height * imageRect.height
@@ -67,20 +67,20 @@ struct FlatMap: View {
 
     /// Converts a position in the cropped image rect back to the full-source
     /// normalized coordinate that the bundled content uses.
-    static func sourcePosition(for point: CGPoint, in imageRect: CGRect) -> CGPoint? {
+    nonisolated static func sourcePosition(for point: CGPoint, in imageRect: CGRect, crop: CGRect = sourceCrop) -> CGPoint? {
         guard imageRect.width > 0, imageRect.height > 0 else { return nil }
         let croppedX = (point.x - imageRect.minX) / imageRect.width
         let croppedY = (point.y - imageRect.minY) / imageRect.height
         guard (0...1).contains(croppedX), (0...1).contains(croppedY) else { return nil }
-        return CGPoint(x: sourceCrop.minX + croppedX * sourceCrop.width,
-                       y: sourceCrop.minY + croppedY * sourceCrop.height)
+        return CGPoint(x: crop.minX + croppedX * crop.width,
+                       y: crop.minY + croppedY * crop.height)
     }
 
     /// Screen points per nautical mile for the cropped presentation. The world
     /// itself remains calibrated against the uncropped 500-NM source width.
-    static func pixelsPerNM(in imageRect: CGRect, mapWidthNM: Double) -> CGFloat {
+    nonisolated static func pixelsPerNM(in imageRect: CGRect, mapWidthNM: Double, crop: CGRect = sourceCrop) -> CGFloat {
         guard mapWidthNM > 0 else { return 0 }
-        return imageRect.width / (sourceCrop.width * CGFloat(mapWidthNM))
+        return imageRect.width / (crop.width * CGFloat(mapWidthNM))
     }
 
     var body: some View {
@@ -115,12 +115,13 @@ struct HexGridOverlay: View {
     let zoom: CGFloat
     let pan: CGSize
     let mapWidthNM: Double
+    var crop: CGRect = FlatMap.sourceCrop
 
     var body: some View {
         Canvas { context, _ in
             guard hexHeightNM > 0, imageRect.width > 0, mapWidthNM > 0 else { return }
 
-            let pixelsPerNM = FlatMap.pixelsPerNM(in: imageRect, mapWidthNM: mapWidthNM)
+            let pixelsPerNM = FlatMap.pixelsPerNM(in: imageRect, mapWidthNM: mapWidthNM, crop: crop)
             let hexHeight = CGFloat(hexHeightNM) * pixelsPerNM
             let hexRadius = hexHeight / 2
             let hexWidth = sqrt(3) * hexRadius
@@ -190,6 +191,7 @@ struct SightseeingCheckpointsOverlay: View {
     let zoom: CGFloat
     let pan: CGSize
     let mapWidthNM: Double
+    var crop: CGRect = FlatMap.sourceCrop
 
     var body: some View {
         Canvas { context, _ in
@@ -197,10 +199,10 @@ struct SightseeingCheckpointsOverlay: View {
 
             for region in regions {
                 for checkpoint in region.checkpoints {
-                    let mapPoint = FlatMap.point(for: checkpoint.relativePosition, in: imageRect)
+                    let mapPoint = FlatMap.point(for: checkpoint.relativePosition, in: imageRect, crop: crop)
                     let center = screenPoint(mapPoint)
                     let radius = CGFloat(checkpoint.toleranceNM)
-                        * FlatMap.pixelsPerNM(in: imageRect, mapWidthNM: mapWidthNM) * zoom
+                        * FlatMap.pixelsPerNM(in: imageRect, mapWidthNM: mapWidthNM, crop: crop) * zoom
                     guard radius > 0 else { continue }
 
                     let circleRect = CGRect(x: center.x - radius,

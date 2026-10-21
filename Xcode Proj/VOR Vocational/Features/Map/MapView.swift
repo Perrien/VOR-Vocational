@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 /// A flat map with an optional side panel, above the full-width NAV cockpit.
-struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
+struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View, ScreenOverlay: View>: View {
     @Bindable var session: FlightSession
     private let configuration: FlightSurfaceConfiguration
 
@@ -11,6 +11,10 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
     /// `imageRect` this view already threads through `FlatMap.point(for:in:)`.
     /// Defaults to none, so Free Flight's rendering is unaffected.
     private let chartOverlay: (CGRect) -> ChartOverlay
+    /// Screen-sized content uses the exact same projection as station symbols.
+    private let screenOverlay: (ChartViewport) -> ScreenOverlay
+    private let cameraPolicy: ChartCameraPolicy
+    private let fitRequest: ChartFitRequest?
 
     /// Mode-owned content beside the chart. Its visibility changes only the
     /// chart's available space, keeping the cockpit and flight session intact.
@@ -35,8 +39,11 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
          sidePanelTitle: String = "Details",
          isSidePanelPresented: Binding<Bool>? = nil,
          flightStatusHeight: CGFloat = 0,
+         cameraPolicy: ChartCameraPolicy = .standard,
+         fitRequest: ChartFitRequest? = nil,
          @ViewBuilder sidePanel: @escaping () -> SidePanel = { EmptyView() },
          @ViewBuilder flightStatus: @escaping () -> FlightStatus = { EmptyView() },
+         @ViewBuilder screenOverlay: @escaping (ChartViewport) -> ScreenOverlay = { _ in EmptyView() },
          @ViewBuilder chartOverlay: @escaping (CGRect) -> ChartOverlay = { _ in EmptyView() }) {
         _session = Bindable(session)
         self.configuration = configuration
@@ -47,6 +54,9 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
         self.flightStatusHeight = flightStatusHeight
         self.flightStatus = flightStatus
         self.chartOverlay = chartOverlay
+        self.screenOverlay = screenOverlay
+        self.cameraPolicy = cameraPolicy
+        self.fitRequest = fitRequest
     }
 
     // The fixed VOR beacons on the land of Myosia.
@@ -62,8 +72,6 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
 
     @State private var panStart: CGSize?
 
-    private let minZoom: CGFloat = 1
-    private let maxZoom: CGFloat = 6
     private let compassRoseMinZoom: CGFloat = 2
 
     var body: some View {
@@ -75,8 +83,8 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
                                  height: max(0, geometry.size.height - cockpitHeight - flightStatusHeight))
             // The cropped map image is aspect-fit inside the map area, so
             // everything on the map is positioned relative to this fitted rect.
-            let imageRect = FlatMap.fittedRect(in: mapSize)
-            let planePos = FlatMap.point(for: session.normalizedAircraftPosition, in: imageRect)
+            let imageRect = FlatMap.fittedRect(in: mapSize, crop: cameraPolicy.crop)
+            let planePos = point(for: session.normalizedAircraftPosition, in: imageRect)
             let nav1Reading = receiverReading(for: session.nav1)
             let nav2Reading = receiverReading(for: session.nav2)
 
@@ -178,10 +186,13 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
                 session.pan = clampedPan(session.pan, zoom: session.zoom, mapSize: mapSize)
             }
             .onChange(of: mapSize) {
-                session.pan = clampedPan(session.pan, zoom: session.zoom, mapSize: mapSize)
+                fitOrClamp(in: mapSize)
+            }
+            .onChange(of: fitRequest) {
+                fitOrClamp(in: mapSize)
             }
             .onAppear {
-                session.pan = clampedPan(session.pan, zoom: session.zoom, mapSize: mapSize)
+                fitOrClamp(in: mapSize)
                 session.showAirports = configuration.showsAirportsByDefault
                 session.showSightseeingRegionNames = configuration.showsSightseeingRegionNamesByDefault
             }
@@ -195,9 +206,10 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
     /// positioned by applying the same zoom/pan transform to their map
     /// coordinates (`screenPoint`).
     private func mapArea(mapSize: CGSize, imageRect: CGRect, planePos: CGPoint) -> some View {
-        ZStack {
+        let viewport = viewport(in: mapSize)
+        return ZStack {
             ZStack {
-                FlatMap(imageRect: imageRect)
+                FlatMap(imageRect: imageRect, crop: cameraPolicy.crop)
                     .frame(width: mapSize.width, height: mapSize.height)
                 chartOverlay(imageRect)
             }
@@ -210,7 +222,8 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
                                mapSize: mapSize,
                                zoom: session.zoom,
                                pan: session.pan,
-                               mapWidthNM: FlatMap.widthNM)
+                               mapWidthNM: FlatMap.widthNM,
+                               crop: cameraPolicy.crop)
             }
 
             if session.showSightseeingRegions {
@@ -219,7 +232,8 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
                                               mapSize: mapSize,
                                               zoom: session.zoom,
                                               pan: session.pan,
-                                              mapWidthNM: FlatMap.widthNM)
+                                              mapWidthNM: FlatMap.widthNM,
+                                              crop: cameraPolicy.crop)
             }
 
             // Radial lines from tuned stations, drawn beneath the station symbols.
@@ -280,11 +294,19 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
             }
 
             if configuration.showsAircraftMarker {
-                PlaneIcon(heading: session.heading)
+                Group {
+                    switch configuration.aircraftMarkerStyle {
+                    case .aircraft: PlaneIcon(heading: session.heading)
+                    case .positionEstimate: PositionEstimateMarker()
+                    }
+                }
                     .position(screenPoint(planePos, mapSize: mapSize))
                     // The plane's own drag wins over panning when the drag starts on it.
                     .highPriorityGesture(planeDrag(planePos: planePos, imageRect: imageRect))
             }
+
+            screenOverlay(viewport)
+                .frame(width: mapSize.width, height: mapSize.height)
 
             if configuration.allowsAircraftSimulation {
                 FlightTimerView(session: session)
@@ -303,11 +325,11 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
         )
     }
 
-    private let mapSpace = "mapArea"
+    private let mapSpace = ChartViewport.coordinateSpace
 
     /// The chart's horizontal scale, shared by reception math and flight movement.
     private func pixelsPerNM(in imageRect: CGRect) -> CGFloat {
-        FlatMap.pixelsPerNM(in: imageRect, mapWidthNM: FlatMap.widthNM)
+        FlatMap.pixelsPerNM(in: imageRect, mapWidthNM: FlatMap.widthNM, crop: cameraPolicy.crop)
     }
 
     /// The radials to draw for the currently received radios, in screen space.
@@ -325,11 +347,7 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
     /// Maps a point in unscaled map space to its on-screen position under the
     /// current camera, matching `.scaleEffect(zoom).offset(pan)` about the center.
     private func screenPoint(_ p: CGPoint, mapSize: CGSize) -> CGPoint {
-        let cx = mapSize.width / 2, cy = mapSize.height / 2
-        return CGPoint(
-            x: (p.x - cx) * session.zoom + cx + session.pan.width,
-            y: (p.y - cy) * session.zoom + cy + session.pan.height
-        )
+        viewport(in: mapSize).screenPoint(forMapPoint: p)
     }
 
     /// Dragging the plane moves it around the map. Translation arrives in the
@@ -345,7 +363,8 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
                 )
                 if let normalizedPosition = FlatMap.sourcePosition(
                     for: clamp(proposed, in: imageRect),
-                    in: imageRect
+                    in: imageRect,
+                    crop: cameraPolicy.crop
                 ) {
                     session.normalizedAircraftPosition = normalizedPosition
                 }
@@ -377,28 +396,31 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
     /// Limits the pan offset so the scaled map always covers the map area —
     /// you can never drag empty space into view. At zoom 1 the only valid pan is zero.
     private func clampedPan(_ proposed: CGSize, zoom: CGFloat, mapSize: CGSize) -> CGSize {
-        let maxX = max(0, mapSize.width * (zoom - 1) / 2)
-        let maxY = max(0, mapSize.height * (zoom - 1) / 2)
-        return CGSize(width: min(max(proposed.width, -maxX), maxX),
-                      height: min(max(proposed.height, -maxY), maxY))
+        cameraPolicy.clampedPan(proposed, zoom: zoom, size: mapSize)
     }
 
     /// Applies a scroll-wheel delta to the zoom, keeping the chart point under
     /// the pointer fixed in place. Positive delta (scroll up) zooms in.
     private func applyZoomDelta(_ deltaY: CGFloat, anchoredAt location: CGPoint, mapSize: CGSize) {
-        let factor = 1 + deltaY * 0.08
-        let oldZoom = session.zoom
-        let newZoom = min(max(oldZoom * factor, minZoom), maxZoom)
-        guard newZoom != oldZoom else { return }
+        // Preserve the original behavior for a large downward scroll: reach
+        // the minimum rather than dropping an event with a nonpositive factor.
+        let factor = max(cameraPolicy.zoomRange.lowerBound / session.zoom, 1 + deltaY * 0.08)
+        let camera = viewport(in: mapSize).zoomed(by: factor, anchoredAt: location, policy: cameraPolicy)
+        session.pan = camera.pan
+        session.zoom = camera.zoom
+    }
 
-        let center = CGPoint(x: mapSize.width / 2, y: mapSize.height / 2)
-        let zoomRatio = newZoom / oldZoom
-        let anchoredPan = CGSize(
-            width: session.pan.width * zoomRatio + (location.x - center.x) * (1 - zoomRatio),
-            height: session.pan.height * zoomRatio + (location.y - center.y) * (1 - zoomRatio)
-        )
-        session.pan = clampedPan(anchoredPan, zoom: newZoom, mapSize: mapSize)
-        session.zoom = newZoom
+    private func viewport(in size: CGSize) -> ChartViewport {
+        ChartViewport(size: size, crop: cameraPolicy.crop, zoom: session.zoom, pan: session.pan)
+    }
+
+    private func fitOrClamp(in size: CGSize) {
+        if let fitRequest, let camera = viewport(in: size).fitting(fitRequest, policy: cameraPolicy) {
+            session.zoom = camera.zoom
+            session.pan = camera.pan
+        } else {
+            session.pan = clampedPan(session.pan, zoom: session.zoom, mapSize: size)
+        }
     }
 
     private func receiverReading(for receiver: NAVReceiver) -> ReceiverReading {
@@ -429,7 +451,7 @@ struct MapView<ChartOverlay: View, SidePanel: View, FlightStatus: View>: View {
 
     /// Converts a normalized map-image coordinate to unscaled map space.
     private func point(for relativePosition: CGPoint, in rect: CGRect) -> CGPoint {
-        FlatMap.point(for: relativePosition, in: rect)
+        FlatMap.point(for: relativePosition, in: rect, crop: cameraPolicy.crop)
     }
 
 }
