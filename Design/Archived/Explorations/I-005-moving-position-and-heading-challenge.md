@@ -1,8 +1,8 @@
 # I-005 — Moving position and heading challenge
 
-[Idea index](../IDEAS.md#i-005--guided-lessons-and-richer-practice)
+[Idea index](../../IDEAS.md#i-005--guided-lessons-and-richer-practice)
 
-Status: implementation delivered in the normal Practice catalog; final commit and actual sleep/wake review pending. Stages 1 and 2 are committed in `abce716` and `9877a3c`. The [implementation plan](../Plans/I-005-Moving-Position-And-Heading-Challenge.md) records normal-catalog, minimum-window, pointer/keyboard, and regression verification. The owner reports the 260-kt pace checked; two actual sleep/wake cycles remain pending. This exploration stays active until that required review is complete. Guided lessons and combined scoring remain later work.
+Status: complete and accepted by the owner on 2026-10-21. All three stages are committed in `abce716`, `9877a3c`, and `9ed6913`. The [archived implementation plan](../Plans/I-005-Moving-Position-And-Heading-Challenge.md) preserves automated, normal-catalog, minimum-window, pointer/keyboard, and regression verification. Following the remaining sleep/wake reminder, the owner confirmed “COmmited and checked”; this is recorded as final review acceptance. Guided lessons and combined scoring remain later work.
 
 ## Purpose and requested experience
 
@@ -127,9 +127,9 @@ The core purpose, flow, flight conditions, marker behavior, timing rules, result
 3. **Visual and camera details:** choose marker dimensions, drag buffer size, color/line styles, exact estimated-heading label/number formatting, comparison-camera limits and manual refit controls. The readout belongs below the indicator. Both positions and full heading arrows must fit in the initial automatic close-up, including tiny errors and coincident positions; numeric measurements remain authoritative. Do not rely on the existing 6× cap or 10-NM minimum fitting span without validating this requirement.
 4. **Catalog wording and exit navigation:** give the second exercise a clear Practice entry while retaining Position Challenge, settle the start/retry wording, and specify leaving an unfinished attempt. Submit is the confirmed ending-action label. Do not add persistence, a leaderboard, or scoring as an incidental solution to these details.
 
-## Delivered bounded slice and outstanding review
+## Delivered and accepted bounded slice
 
-The [implementation plan](../Plans/I-005-Moving-Position-And-Heading-Challenge.md) has delivered the playable moving position-and-heading exercise under Practice, plus the shared precise arrowless marker in the stationary exercise. It separates hidden truth from estimates, proves initial scenario validity, uses an awake-time clock, and provides a frozen comparison with exact centers. Its final commit checkpoint and actual sleep/wake review remain open; keep this record active until review is complete.
+The [implementation plan](../Plans/I-005-Moving-Position-And-Heading-Challenge.md) has delivered the playable moving position-and-heading exercise under Practice, plus the shared precise arrowless marker in the stationary exercise. It separates hidden truth from estimates, proves initial scenario validity, uses an awake-time clock, and provides a frozen comparison with exact centers. The final catalog implementation is committed in `9ed6913`; the owner has confirmed the outstanding review. This bounded record and its plan are archived, with later guided lessons and scoring kept outside the completed scope.
 
 The owner must be able to try the slice through the normal Practice catalog: start, tune, drag, enter heading, observe the running timer, Submit, inspect the automatically zoomed two-arrow result, and Try Again with a new situation. The stationary catalog entry must also provide the precise draggable circle with no arrow. Early visual review should make the marker's interior and buffer easy to test, and make close, coincident, and widely separated result markers inspectable without waiting for a complete flight each time. These are user-visible review outcomes, not a file-level build checklist.
 

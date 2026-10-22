@@ -34,7 +34,7 @@ A timed Practice exercise with a hidden aircraft flying at 260 kt in still air. 
 
 **Heading Indicator**
 
-The compass display showing heading and directional markings. In flight it shows the aircraft's actual heading. In the [moving Practice exercise](Explorations/I-005-moving-position-and-heading-challenge.md), available from the Practice catalog, it shows the player's estimated heading.
+The compass display showing heading and directional markings. In flight it shows the aircraft's actual heading. In the [moving Practice exercise](Archived/Explorations/I-005-moving-position-and-heading-challenge.md), available from the Practice catalog, it shows the player's estimated heading.
 
 **Heading Knob**
 
