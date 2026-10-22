@@ -26,11 +26,15 @@ A review after a flight ends, comparing the planned route with the flown path an
 
 A Practice exercise in which the app hides the real position, the player uses VOR indications to infer it, then places a guess on the chart and sees the error in nautical miles.
 
+**Position & Heading Challenge**
+
+A timed Practice exercise with a hidden aircraft flying at 260 kt in still air. The player estimates its current position and heading, then submits to see separate distance error, heading error, and elapsed awake time. The heading knob adjusts the estimate without steering the aircraft.
+
 ## Flight instruments
 
 **Heading Indicator**
 
-The compass display showing heading and directional markings. In flight it shows the aircraft's actual heading. In the [moving Practice exercise](Explorations/I-005-moving-position-and-heading-challenge.md), currently available through Debug Preview, it shows the player's estimated heading.
+The compass display showing heading and directional markings. In flight it shows the aircraft's actual heading. In the [moving Practice exercise](Explorations/I-005-moving-position-and-heading-challenge.md), available from the Practice catalog, it shows the player's estimated heading.
 
 **Heading Knob**
 

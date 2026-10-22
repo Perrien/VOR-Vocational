@@ -18,11 +18,11 @@ Each entry is one individually addressable idea. Refer to its ID—for example, 
 
 ### I-005 — Guided lessons and richer Practice
 
-**Status:** In progress — Stage 1 committed; Stage 2 implemented through Debug Preview, owner checkpoint pending
+**Status:** Moving exercise implemented in Practice; final commit and actual sleep/wake review pending
 **Type:** Initiative
-**Next action:** Try Stage 2 of the [moving position and heading challenge plan](Plans/I-005-Moving-Position-And-Heading-Challenge.md), review its pending layout/input and actual sleep checks, choose whether to commit, then authorize Stage 3 catalog integration
+**Next action:** Review/commit the delivered catalog integration, complete two actual sleep/wake checks in the [active plan](Plans/I-005-Moving-Position-And-Heading-Challenge.md), then close/archive this bounded scope and explore the next guided lesson
 
-**What it is:** Add a timed, still-air position-and-heading challenge with a precise circle-and-arrow marker and separate distance error, heading error, and elapsed-time results. Reuse the circle without its arrow in the stationary challenge; combined scoring and guided lessons remain later scope.
+**What it is:** Guided navigation lessons and richer Practice. The moving position-and-heading exercise now provides separate distance, heading, and elapsed-time results; stationary Practice uses the shared arrowless circle. Guided VOR-reading, two-VOR fixes, and radial intercept/tracking lessons remain later scope. Consider combined scoring only when the owner chooses it.
 
 **Exploration:** [Moving position and heading challenge](Explorations/I-005-moving-position-and-heading-challenge.md)
 

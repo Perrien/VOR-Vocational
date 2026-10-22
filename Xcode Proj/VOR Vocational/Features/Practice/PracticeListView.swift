@@ -1,19 +1,20 @@
 import SwiftUI
 
-/// Practice's catalog (S2): Position Challenge is the one actionable row,
-/// with a clear Start affordance (U7); any other Practice entry would be a
-/// non-selectable "Coming soon" row styled like Learn and Missions' shared
-/// rows (U3), but none are named yet, so the list holds just Position
-/// Challenge today. Selecting it shows `PositionChallengeView` in place.
+/// Each exercise replaces the catalog. Returning removes its local state,
+/// so opening the moving exercise again always presents a fresh ready screen.
 struct PracticeListView: View {
     var onHome: () -> Void
 
-    @State private var isChallengeActive = false
+    private enum Exercise { case position, positionAndHeading }
+    @State private var selectedExercise: Exercise?
 
     var body: some View {
-        if isChallengeActive {
+        switch selectedExercise {
+        case .position:
             PositionChallengeView(onHome: onHome)
-        } else {
+        case .positionAndHeading:
+            MovingPositionChallengeView(onPractice: { selectedExercise = nil }, onHome: onHome)
+        case nil:
             catalog
         }
     }
@@ -49,7 +50,9 @@ struct PracticeListView: View {
                 .foregroundStyle(ControlPalette.primaryText)
 
             VStack(spacing: 0) {
-                PositionChallengeRow { isChallengeActive = true }
+                PracticeExerciseRow(title: "Position Challenge") { selectedExercise = .position }
+                Divider()
+                PracticeExerciseRow(title: "Position & Heading Challenge") { selectedExercise = .positionAndHeading }
             }
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
@@ -61,16 +64,15 @@ struct PracticeListView: View {
     }
 }
 
-/// Practice's one functional row: selecting it starts Position Challenge.
-/// No description line, matching S5's "no repeated descriptions" rule for
-/// every Mode list.
-private struct PositionChallengeRow: View {
+/// Matches the other mode catalogs' title and Start affordance.
+private struct PracticeExerciseRow: View {
+    let title: String
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack {
-                Text("Position Challenge")
+                Text(title)
                     .font(.body.weight(.medium))
                     .foregroundStyle(ControlPalette.primaryText)
                 Spacer()
